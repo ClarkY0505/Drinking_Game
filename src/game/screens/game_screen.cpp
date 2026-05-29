@@ -7,7 +7,11 @@
  * All rights reserved.
  *******************************************/
 #include <iostream>
-#include "engine/game_screen.h"
+#include "game/game_screen.h"
+
+bool GameScreen::init(SDL_Renderer* r){
+    return true;
+}
 
 void GameScreen::on_enter()
 {

@@ -1,9 +1,10 @@
 #include "app/game.h"
 
 #include <iostream>
+#include <SDL2/SDL_image.h>
 
-#include "engine/game_screen.h"
-#include "engine/title_screen.h"
+#include "game/game_screen.h"
+#include "game/title_screen.h"
 
 namespace {  // 匿名命名空间：这里的变量和函数只在本 cpp 文件中可见
 constexpr int WINDOW_WIDTH = 1280;  // 窗口宽度，单位是像素
@@ -18,15 +19,20 @@ float seconds_since(Uint64 previous, Uint64 current) {  // 计算两次计时器
 Game::Game() = default;
 
 bool Game::init() {
+    // 支持PNG加载
+    if (!(IMG_Init(IMG_INIT_PNG) & IMG_INIT_PNG)) {
+        SDL_Log("IMG_Init Error: %s", IMG_GetError());
+        return false;
+    }
+
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) != 0) {
         std::cerr << "SDL_Init failed: " << SDL_GetError()
                   << std::endl;  // 初始化失败时打印 SDL 的错误信息
         return false;
     }
 
-    _window =
-        SDL_CreateWindow("Drinking Game", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-                         WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_SHOWN);
+    _window = SDL_CreateWindow("Drinking Game", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+                               WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_SHOWN);
 
     if (nullptr == _window) {
         std::cerr << "SDL_CreateWindow failed: " << SDL_GetError()
@@ -134,6 +140,7 @@ void Game::render() {
     Screen* current_screen =
         _screen_manager.current();  // 再次取当前界面，因为事件处理可能改变了界面
     if (current_screen != nullptr) {           // 如果当前还有界面
+        current_screen->init(_renderer);
         current_screen->on_render(_renderer);  // 调用当前界面的绘制逻辑，画到 renderer 上
         SDL_RenderPresent(_renderer);  // 把 renderer 中画好的内容真正显示到窗口上
     }

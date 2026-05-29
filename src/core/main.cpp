@@ -4,9 +4,9 @@
 #include <memory>    // 引入 std::unique_ptr 和 std::make_unique
 
 #include "app/game.h"
-#include "engine/game_screen.h"   // 引入游戏界面 GameScreen
-#include "engine/title_screen.h"  // 引入标题界面 TitleScreen
-#include "game/screen_manager.h"  // 引入屏幕管理器 ScreenManager
+#include "game/game_screen.h"  // 引入游戏界面 GameScreen
+#include "game/title_screen.h"  // 引入标题界面 TitleScreen
+#include "engine/screen_manager.h"  // 引入屏幕管理器 ScreenManager
 
 int main() {  // 程序入口函数
     Game& game = Game::instance();

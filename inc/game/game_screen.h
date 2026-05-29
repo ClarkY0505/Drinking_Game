@@ -9,7 +9,7 @@
 #ifndef DRINKING_GAME_UI_GAME_SCREEN_H
 #define DRINKING_GAME_UI_GAME_SCREEN_H
 
-#include "game/screen.h"
+#include "engine/screen.h"
 
 class GameScreen : public Screen{
 public:
@@ -18,6 +18,8 @@ public:
     void on_event(const SDL_Event& e) override;
     void on_update(float dt) override;
     void on_render(SDL_Renderer* r) override;
+
+    bool init(SDL_Renderer* r) override;
  };
 
 #endif

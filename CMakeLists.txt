@@ -48,6 +48,24 @@ endfunction()
 
 drinking_game_find_sdl2(DRINKING_GAME_SDL2_TARGET)
 
+function(drinking_game_find_sdl2_image out_target)
+    find_package(SDL2_image CONFIG QUIET)
+
+    if(TARGET SDL2_image::SDL2_image)
+        set(_sdl2_image_target SDL2_image::SDL2_image)
+    elseif(TARGET SDL2_image::SDL2_image-static)
+        set(_sdl2_image_target SDL2_image::SDL2_image-static)
+    else()
+        find_package(PkgConfig REQUIRED)
+        pkg_check_modules(SDL2_IMAGE REQUIRED IMPORTED_TARGET SDL2_image)
+        set(_sdl2_image_target PkgConfig::SDL2_IMAGE)
+    endif()
+
+    set(${out_target} "${_sdl2_image_target}" PARENT_SCOPE)
+endfunction()
+
+drinking_game_find_sdl2_image(DRINKING_GAME_SDL2_IMAGE_TARGET)
+
 if(ANDROID)
     add_library(main SHARED ${DRINKING_GAME_SOURCES})
     set(DRINKING_GAME_TARGET main)
@@ -75,6 +93,7 @@ target_include_directories(${DRINKING_GAME_TARGET}
 target_link_libraries(${DRINKING_GAME_TARGET}
     PRIVATE
         ${DRINKING_GAME_SDL2_TARGET}
+        ${DRINKING_GAME_SDL2_IMAGE_TARGET}
 )
 
 if(MSVC)

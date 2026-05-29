@@ -12,7 +12,7 @@
 #include <stack>
 #include <SDL2/SDL.h>
 #include <memory>
-#include "game/screen.h"
+#include "screen.h"
 
 class ScreenManager
 {

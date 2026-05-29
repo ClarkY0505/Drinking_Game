@@ -19,6 +19,7 @@ public:
     virtual void on_event(const SDL_Event& e) = 0;
     virtual void on_update(float dt) = 0;
     virtual void on_render(SDL_Renderer* r) = 0;
+    virtual bool init(SDL_Renderer* r) = 0;
 };
 
 #endif

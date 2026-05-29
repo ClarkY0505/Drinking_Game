@@ -1,7 +1,7 @@
 #ifndef DRINKING_GAME_APP_GAME_H
 #define DRINKING_GAME_APP_GAME_H
 
-#include "game/screen_manager.h"
+#include "engine/screen_manager.h"
 
 class Game {
    public:
