@@ -12,7 +12,7 @@
 #include "engine/screen.h"
 
 class TitleScreen : public Screen {
-public:
+   public:
     ~TitleScreen();
 
     void on_enter() override;
@@ -22,9 +22,23 @@ public:
     void on_render(SDL_Renderer* r) override;
 
     bool init(SDL_Renderer* r) override;
-    
-private:
+
+   private:
+    void render_fog_layer(SDL_Renderer* r, float x, int y, int w, int h, Uint8 alpha,
+                          SDL_RendererFlip flip);
+    void render_fog_layer_right(SDL_Renderer* r, float x, int y, int w, int h, Uint8 alpha,
+                                SDL_RendererFlip flip);
+
+   private:
     SDL_Texture* _background = nullptr;
+    SDL_Texture* _fog = nullptr;
+
+    float _fogX_1 = 0.0f;
+    float _fogX_2 = 0.0f;
+    float _fogX_3 = 0.0f;
+    float _fogSpeed_1 = 15.0f;
+    float _fogSpeed_2 = 30.0f;
+    float _fogSpeed_3 = 8.0f;
 };
 
 #endif
