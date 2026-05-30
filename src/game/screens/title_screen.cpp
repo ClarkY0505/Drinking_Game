@@ -13,6 +13,7 @@
 #include <SDL_render.h>
 #include <SDL_stdinc.h>
 
+#include <cmath>
 #include <iostream>
 
 TitleScreen::~TitleScreen() {
@@ -68,20 +69,25 @@ void TitleScreen::on_event(const SDL_Event& e) {
 }
 
 void TitleScreen::on_update(float dt) {
-    // 更新雾位置
-    _fogX_1 -= _fogSpeed_1 * dt;
-    if (_fogX_1 <= -1280) {
-        _fogX_1 = 0;
+    _fogTime += dt;
+
+    const float layer_1_speed = _fogSpeed_1 + 2.0f * std::sin(_fogTime * 0.37f);
+    const float layer_2_speed = _fogSpeed_2 + 3.5f * std::sin(_fogTime * 0.29f + 1.8f);
+    const float layer_3_speed = _fogSpeed_3 + 1.5f * std::sin(_fogTime * 0.21f + 3.4f);
+
+    _fogX_1 -= layer_1_speed * dt;
+    while (_fogX_1 <= -1280.0f) {
+        _fogX_1 += 1280.0f;
     }
 
-    _fogX_2 -= _fogSpeed_2 * dt;
-    if (_fogX_2 <= -1280) {
-        _fogX_2 = 0;
+    _fogX_2 -= layer_2_speed * dt;
+    while (_fogX_2 <= -1280.0f) {
+        _fogX_2 += 1280.0f;
     }
 
-    _fogX_3 += _fogSpeed_3 * dt;
-    if (_fogX_3 >= 1280) {
-        _fogX_3 = 0;
+    _fogX_3 += layer_3_speed * dt;
+    while (_fogX_3 >= 1280.0f) {
+        _fogX_3 -= 1280.0f;
     }
 }
 
@@ -97,8 +103,8 @@ void TitleScreen::render_fog_layer(SDL_Renderer* r, float x, int y, int w, int h
     SDL_RenderCopyEx(r, _fog, nullptr, &fog_2, 0, nullptr, flip);
 }
 
-void TitleScreen::render_fog_layer_right(SDL_Renderer* r, float x, int y, int w, int h, Uint8 alpha,SDL_RendererFlip flip)
-{
+void TitleScreen::render_fog_layer_right(SDL_Renderer* r, float x, int y, int w, int h, Uint8 alpha,
+                                         SDL_RendererFlip flip) {
     SDL_SetTextureAlphaMod(_fog, alpha);
 
     SDL_Rect fog_1{static_cast<int>(x), y, w, h};
@@ -113,14 +119,24 @@ void TitleScreen::on_render(SDL_Renderer* r) {
     // SDL_RenderClear(r);
     SDL_RenderCopy(r, _background, nullptr, nullptr);
 
-    // 渲染两层雾，达到循环滚动
-    float alpha_1 = 60 + 20 * sin(SDL_GetTicks() * 0.0003f);
-    float alpha_2 = 50 + 25 * sin(SDL_GetTicks() * 0.00025f);
-    float alpha_3 = 40 + 15 * sin(SDL_GetTicks() * 0.00035f);
+    const int y_1 = 330 + static_cast<int>(4.0f * std::sin(_fogTime * 0.41f + 0.7f));
+    const int y_2 = 430 + static_cast<int>(6.0f * std::sin(_fogTime * 0.33f + 2.2f));
+    const int y_3 = 250 + static_cast<int>(3.0f * std::sin(_fogTime * 0.27f + 4.1f));
+
+    const float alpha_1 =
+        // 58.0f + 14.0f * std::sin(_fogTime * 0.21f) + 6.0f * std::sin(_fogTime * 0.07f + 1.4f);
+        58.0f + 14.0f * std::sin(_fogTime * 0.53f) + 6.0f * std::sin(_fogTime * 0.17f + 1.4f);
+    const float alpha_2 =
+        // 48.0f + 16.0f * std::sin(_fogTime * 0.18f + 2.1f) + 7.0f * std::sin(_fogTime * 0.08f);
+        48.0f + 16.0f * std::sin(_fogTime * 0.47f + 2.1f) + 7.0f * std::sin(_fogTime * 0.19f);
+    const float alpha_3 =
+        // 38.0f + 11.0f * std::sin(_fogTime * 0.24f + 3.6f) + 5.0f * std::sin(_fogTime * 0.09f);
+        38.0f + 11.0f * std::sin(_fogTime * 0.59f + 3.6f) + 5.0f * std::sin(_fogTime * 0.23f);
     // SDL_SetTextureAlphaMod(_fog, static_cast<Uint8>(alpha));
-    render_fog_layer_right(r, _fogX_3, 250, 1280, 400, static_cast<Uint8>(alpha_3), SDL_FLIP_HORIZONTAL);
+    render_fog_layer_right(r, _fogX_3, y_3, 1280, 400, static_cast<Uint8>(alpha_3),
+                           SDL_FLIP_HORIZONTAL);
 
-    render_fog_layer(r, _fogX_1, 330, 1280, 360, static_cast<Uint8>(alpha_1), SDL_FLIP_NONE);
+    render_fog_layer(r, _fogX_1, y_1, 1280, 360, static_cast<Uint8>(alpha_1), SDL_FLIP_NONE);
 
-    render_fog_layer(r, _fogX_2, 430, 1280, 300, static_cast<Uint8>(alpha_2), SDL_FLIP_NONE);
+    render_fog_layer(r, _fogX_2, y_2, 1280, 300, static_cast<Uint8>(alpha_2), SDL_FLIP_NONE);
 }

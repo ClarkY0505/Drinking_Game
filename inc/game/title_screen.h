@@ -36,6 +36,7 @@ class TitleScreen : public Screen {
     float _fogX_1 = 0.0f;
     float _fogX_2 = 0.0f;
     float _fogX_3 = 0.0f;
+    float _fogTime = 0.0f;
     float _fogSpeed_1 = 15.0f;
     float _fogSpeed_2 = 30.0f;
     float _fogSpeed_3 = 8.0f;

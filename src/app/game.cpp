@@ -56,8 +56,10 @@ bool Game::init() {
         return false;  // 返回非 0，表示程序异常退出
     }
 
-    _screen_manager.push(
-        std::make_unique<TitleScreen>());  // 把标题界面压入管理器，作为第一个显示的界面
+    if (!push_screen(std::make_unique<TitleScreen>())) {  // 把标题界面作为第一个显示的界面
+        return false;
+    }
+
     return true;
 }
 
@@ -88,8 +90,10 @@ void Game::handle_events() {
             switch (event.key.keysym.sym) {  // 根据具体按下的按键做不同处理
                 case SDLK_RETURN:            // SDLK_RETURN 表示回车键
                     if (!in_game) {  // 只有当前不在游戏界面时，回车才进入游戏
-                        _screen_manager.push(
-                            std::make_unique<GameScreen>());  // 创建游戏界面并压入管理器
+                        if (!push_screen(std::make_unique<GameScreen>())) {  // 创建游戏界面并压入管理器
+                            _running = false;
+                            break;
+                        }
                         in_game = true;             // 标记当前已经进入游戏界面
                         handled_navigation = true;  // 标记这个按键已经用于界面切换
                     }
@@ -140,10 +144,18 @@ void Game::render() {
     Screen* current_screen =
         _screen_manager.current();  // 再次取当前界面，因为事件处理可能改变了界面
     if (current_screen != nullptr) {           // 如果当前还有界面
-        current_screen->init(_renderer);
         current_screen->on_render(_renderer);  // 调用当前界面的绘制逻辑，画到 renderer 上
         SDL_RenderPresent(_renderer);  // 把 renderer 中画好的内容真正显示到窗口上
     }
+}
+
+bool Game::push_screen(std::unique_ptr<Screen> screen) {
+    if (!screen->init(_renderer)) {
+        return false;
+    }
+
+    _screen_manager.push(std::move(screen));
+    return true;
 }
 
 void Game::shutdown() {

@@ -25,6 +25,7 @@ class Game {
     void update(float dt);
     void render();
     float calc_delta_time();
+    bool push_screen(std::unique_ptr<Screen> screen);
 
    private:
     SDL_Window* _window = nullptr;
