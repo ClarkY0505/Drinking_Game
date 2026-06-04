@@ -9,7 +9,16 @@
 #ifndef DRINKING_GAME_UI_TITLE_SCREEN_H
 #define DRINKING_GAME_UI_TITLE_SCREEN_H
 
+#include <functional>
+#include <vector>
+
 #include "engine/screen.h"
+#include "widgets/button.h"
+
+struct MenuButton{
+    Button button;
+    std::function<void()> on_click;
+};
 
 class TitleScreen : public Screen {
    public:
@@ -32,6 +41,10 @@ class TitleScreen : public Screen {
    private:
     SDL_Texture* _background = nullptr;
     SDL_Texture* _fog = nullptr;
+    Button _start_btn;
+
+    std::vector<MenuButton> _buttons;
+
 
     float _fogX_1 = 0.0f;
     float _fogX_2 = 0.0f;

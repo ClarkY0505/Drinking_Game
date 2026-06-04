@@ -6,3 +6,7 @@
  * Copyright (c) 2026
  * All rights reserved.
  *******************************************/
+#ifndef DRINKING_GAME_UI_CLASS_PICK_SCREEN_H
+#define DRINKING_GAME_UI_CLASS_PICK_SCREEN_H
+
+#endif

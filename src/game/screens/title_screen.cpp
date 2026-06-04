@@ -8,6 +8,7 @@
  *******************************************/
 #include "game/title_screen.h"
 
+#include <SDL_events.h>
 #include <SDL_image.h>
 #include <SDL_rect.h>
 #include <SDL_render.h>
@@ -15,6 +16,8 @@
 
 #include <cmath>
 #include <iostream>
+
+#include "widgets/button.h"
 
 TitleScreen::~TitleScreen() {
     if (_background) {
@@ -28,6 +31,26 @@ TitleScreen::~TitleScreen() {
 
 bool TitleScreen::init(SDL_Renderer* r) {
     _background = IMG_LoadTexture(r, "assets/images/background.png");
+    _buttons.push_back(
+        {Button{{1000, 50, 200, 60}}, 
+            [this]() {
+                SDL_Log("Start Button Clicked"); 
+            }
+        });
+
+    _buttons.push_back(
+        {Button{{1000, 130, 200, 60}}, 
+            [this]() { 
+                SDL_Log("Start Button Clicked"); 
+            }
+        });
+
+    _buttons.push_back(
+        {Button{{1000, 210, 200, 60}}, 
+            [this]() { 
+                SDL_Log("Start Button Clicked"); 
+            }
+        });
 
     if (!_background) {
         SDL_Log("Load background failed: %s", IMG_GetError());
@@ -41,7 +64,6 @@ bool TitleScreen::init(SDL_Renderer* r) {
     }
 
     SDL_SetTextureBlendMode(_fog, SDL_BLENDMODE_BLEND);
-    // SDL_SetTextureAlphaMod(_fog, 60);
 
     return true;
 }
@@ -55,16 +77,15 @@ void TitleScreen::on_exit() {
 }
 
 void TitleScreen::on_event(const SDL_Event& e) {
-    if (SDL_KEYDOWN == e.type) {
-        // switch(e.key.keysym.sym){
-        //     case SDLK_RETURN:
-        //         std::cout << "Start Game" << std::endl;
-        //         break;
-        //     case SDLK_ESCAPE:
-        //         std::cout << "Exit Game" << std::endl;
-        //         break;
-        // }
-        std::cout << "Menu Key Press" << std::endl;
+    if (e.type == SDL_MOUSEBUTTONDOWN) {
+        int x = e.button.x;
+        int y = e.button.y;
+
+        for (auto& it : _buttons) {
+            if (it.button.is_clicked(x, y)) {
+                it.on_click();
+            }
+        }
     }
 }
 
@@ -115,8 +136,7 @@ void TitleScreen::render_fog_layer_right(SDL_Renderer* r, float x, int y, int w,
 }
 
 void TitleScreen::on_render(SDL_Renderer* r) {
-    // SDL_SetRenderDrawColor(r, 50, 50, 200, 255);
-    // SDL_RenderClear(r);
+
     SDL_RenderCopy(r, _background, nullptr, nullptr);
 
     const int y_1 = 330 + static_cast<int>(4.0f * std::sin(_fogTime * 0.41f + 0.7f));
@@ -132,11 +152,15 @@ void TitleScreen::on_render(SDL_Renderer* r) {
     const float alpha_3 =
         // 38.0f + 11.0f * std::sin(_fogTime * 0.24f + 3.6f) + 5.0f * std::sin(_fogTime * 0.09f);
         38.0f + 11.0f * std::sin(_fogTime * 0.59f + 3.6f) + 5.0f * std::sin(_fogTime * 0.23f);
-    // SDL_SetTextureAlphaMod(_fog, static_cast<Uint8>(alpha));
     render_fog_layer_right(r, _fogX_3, y_3, 1280, 400, static_cast<Uint8>(alpha_3),
                            SDL_FLIP_HORIZONTAL);
 
     render_fog_layer(r, _fogX_1, y_1, 1280, 360, static_cast<Uint8>(alpha_1), SDL_FLIP_NONE);
 
     render_fog_layer(r, _fogX_2, y_2, 1280, 300, static_cast<Uint8>(alpha_2), SDL_FLIP_NONE);
+
+    for (auto& it : _buttons) {
+        SDL_SetRenderDrawColor(r, 255, 0, 0, 255);
+        SDL_RenderFillRect(r, &it.button.rect);
+    }
 }
