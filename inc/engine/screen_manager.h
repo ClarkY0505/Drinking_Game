@@ -9,19 +9,20 @@
 #ifndef DRINKING_GAME_UI_SCREEN_MANAGER_H
 #define DRINKING_GAME_UI_SCREEN_MANAGER_H
 
-#include <stack>
 #include <SDL2/SDL.h>
+
 #include <memory>
+#include <stack>
+
 #include "screen.h"
 
-class ScreenManager
-{
+class ScreenManager {
     std::stack<std::unique_ptr<Screen>> m_screens;
 
-public:
-
+   public:
     void push(std::unique_ptr<Screen> s);
     void pop();
+    void clear();
     Screen *current();
     bool empty() const;
 };

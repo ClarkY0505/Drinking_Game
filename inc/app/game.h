@@ -26,6 +26,7 @@ class Game {
     void render();
     float calc_delta_time();
     bool push_screen(std::unique_ptr<Screen> screen);
+    void execute_command(ScreenCommand command);
 
    private:
     SDL_Window* _window = nullptr;
@@ -34,7 +35,6 @@ class Game {
     ScreenManager _screen_manager;
 
     bool _running = true;
-    bool in_game = false;
 
     Uint64 previous_counter = 0;
 };

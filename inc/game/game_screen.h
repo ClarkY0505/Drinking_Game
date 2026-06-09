@@ -11,15 +11,15 @@
 
 #include "engine/screen.h"
 
-class GameScreen : public Screen{
-public:
+class GameScreen : public Screen {
+   public:
     void on_enter() override;
     void on_exit() override;
-    void on_event(const SDL_Event& e) override;
+    ScreenCommand on_event(const SDL_Event& e) override;
     void on_update(float dt) override;
     void on_render(SDL_Renderer* r) override;
 
     bool init(SDL_Renderer* r) override;
- };
+};
 
 #endif

@@ -17,53 +17,38 @@
 #include <cmath>
 #include <iostream>
 
+#include "game/game_screen.h"
 #include "widgets/button.h"
 
-TitleScreen::~TitleScreen() {
-    if (_background) {
-        SDL_DestroyTexture(_background);
-    }
-
-    if (_fog) {
-        SDL_DestroyTexture(_fog);
-    }
-}
-
 bool TitleScreen::init(SDL_Renderer* r) {
-    _background = IMG_LoadTexture(r, "assets/images/background.png");
-    _buttons.push_back(
-        {Button{{1000, 50, 200, 60}}, 
-            [this]() {
-                SDL_Log("Start Button Clicked"); 
-            }
-        });
+    _background = make_texture_ptr(IMG_LoadTexture(r, "assets/images/background.png"));
+    _buttons.push_back({Button{{1000, 50, 200, 60}}, []() {
+                            SDL_Log("Start Button Clicked");
+                            return ScreenCommand::push(std::make_unique<GameScreen>());
+                        }});
 
-    _buttons.push_back(
-        {Button{{1000, 130, 200, 60}}, 
-            [this]() { 
-                SDL_Log("Start Button Clicked"); 
-            }
-        });
+    _buttons.push_back({Button{{1000, 130, 200, 60}}, []() {
+                            SDL_Log("Menu Button Clicked");
+                            return ScreenCommand::none();
+                        }});
 
-    _buttons.push_back(
-        {Button{{1000, 210, 200, 60}}, 
-            [this]() { 
-                SDL_Log("Start Button Clicked"); 
-            }
-        });
+    _buttons.push_back({Button{{1000, 210, 200, 60}}, []() {
+                            SDL_Log("Menu Button Clicked");
+                            return ScreenCommand::none();
+                        }});
 
     if (!_background) {
         SDL_Log("Load background failed: %s", IMG_GetError());
         return false;
     }
 
-    _fog = IMG_LoadTexture(r, "assets/images/fog.png");
+    _fog = make_texture_ptr(IMG_LoadTexture(r, "assets/images/fog.png"));
     if (!_fog) {
         SDL_Log("load fog failed: %s", IMG_GetError());
         return false;
     }
 
-    SDL_SetTextureBlendMode(_fog, SDL_BLENDMODE_BLEND);
+    SDL_SetTextureBlendMode(_fog.get(), SDL_BLENDMODE_BLEND);
 
     return true;
 }
@@ -76,17 +61,30 @@ void TitleScreen::on_exit() {
     std::cout << "Exit Menu" << std::endl;
 }
 
-void TitleScreen::on_event(const SDL_Event& e) {
+ScreenCommand TitleScreen::on_event(const SDL_Event& e) {
+    if (e.type == SDL_KEYDOWN) {
+        switch (e.key.keysym.sym) {
+            case SDLK_RETURN:
+                return ScreenCommand::push(std::make_unique<GameScreen>());
+            case SDLK_ESCAPE:
+                return ScreenCommand::quit();
+            default:
+                break;
+        }
+    }
+
     if (e.type == SDL_MOUSEBUTTONDOWN) {
         int x = e.button.x;
         int y = e.button.y;
 
         for (auto& it : _buttons) {
             if (it.button.is_clicked(x, y)) {
-                it.on_click();
+                return it.on_click();
             }
         }
     }
+
+    return ScreenCommand::none();
 }
 
 void TitleScreen::on_update(float dt) {
@@ -115,29 +113,28 @@ void TitleScreen::on_update(float dt) {
 void TitleScreen::render_fog_layer(SDL_Renderer* r, float x, int y, int w, int h, Uint8 alpha,
                                    SDL_RendererFlip flip) {
     // 修改雾的薄厚
-    SDL_SetTextureAlphaMod(_fog, alpha);
+    SDL_SetTextureAlphaMod(_fog.get(), alpha);
 
     SDL_Rect fog_1{static_cast<int>(x), y, w, h};
     SDL_Rect fog_2{static_cast<int>(x) + w, y, w, h};
 
-    SDL_RenderCopyEx(r, _fog, nullptr, &fog_1, 0, nullptr, flip);
-    SDL_RenderCopyEx(r, _fog, nullptr, &fog_2, 0, nullptr, flip);
+    SDL_RenderCopyEx(r, _fog.get(), nullptr, &fog_1, 0, nullptr, flip);
+    SDL_RenderCopyEx(r, _fog.get(), nullptr, &fog_2, 0, nullptr, flip);
 }
 
 void TitleScreen::render_fog_layer_right(SDL_Renderer* r, float x, int y, int w, int h, Uint8 alpha,
                                          SDL_RendererFlip flip) {
-    SDL_SetTextureAlphaMod(_fog, alpha);
+    SDL_SetTextureAlphaMod(_fog.get(), alpha);
 
     SDL_Rect fog_1{static_cast<int>(x), y, w, h};
     SDL_Rect fog_2{static_cast<int>(x) - w, y, w, h};
 
-    SDL_RenderCopyEx(r, _fog, nullptr, &fog_1, 0, nullptr, flip);
-    SDL_RenderCopyEx(r, _fog, nullptr, &fog_2, 0, nullptr, flip);
+    SDL_RenderCopyEx(r, _fog.get(), nullptr, &fog_1, 0, nullptr, flip);
+    SDL_RenderCopyEx(r, _fog.get(), nullptr, &fog_2, 0, nullptr, flip);
 }
 
 void TitleScreen::on_render(SDL_Renderer* r) {
-
-    SDL_RenderCopy(r, _background, nullptr, nullptr);
+    SDL_RenderCopy(r, _background.get(), nullptr, nullptr);
 
     const int y_1 = 330 + static_cast<int>(4.0f * std::sin(_fogTime * 0.41f + 0.7f));
     const int y_2 = 430 + static_cast<int>(6.0f * std::sin(_fogTime * 0.33f + 2.2f));

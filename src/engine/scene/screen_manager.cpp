@@ -9,14 +9,12 @@
 
 #include "engine/screen_manager.h"
 
-void ScreenManager::push(std::unique_ptr<Screen> s)
-{
+void ScreenManager::push(std::unique_ptr<Screen> s) {
     s->on_enter();
     m_screens.push(std::move(s));
 }
 
-void ScreenManager::pop()
-{
+void ScreenManager::pop() {
     if (m_screens.empty()) {
         return;
     }
@@ -25,16 +23,20 @@ void ScreenManager::pop()
     m_screens.pop();
 }
 
-Screen* ScreenManager::current() 
-{ 
+void ScreenManager::clear() {
+    while (!m_screens.empty()) {
+        pop();
+    }
+}
+
+Screen* ScreenManager::current() {
     if (m_screens.empty()) {
         return nullptr;
     }
 
-    return m_screens.top().get(); 
+    return m_screens.top().get();
 }
 
-bool ScreenManager::empty() const
-{
+bool ScreenManager::empty() const {
     return m_screens.empty();
 }

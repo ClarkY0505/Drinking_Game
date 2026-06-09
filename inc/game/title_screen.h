@@ -13,20 +13,19 @@
 #include <vector>
 
 #include "engine/screen.h"
+#include "engine/sdl_resource.h"
 #include "widgets/button.h"
 
-struct MenuButton{
+struct MenuButton {
     Button button;
-    std::function<void()> on_click;
+    std::function<ScreenCommand()> on_click;
 };
 
 class TitleScreen : public Screen {
    public:
-    ~TitleScreen();
-
     void on_enter() override;
     void on_exit() override;
-    void on_event(const SDL_Event& e) override;
+    ScreenCommand on_event(const SDL_Event& e) override;
     void on_update(float dt) override;
     void on_render(SDL_Renderer* r) override;
 
@@ -39,11 +38,10 @@ class TitleScreen : public Screen {
                                 SDL_RendererFlip flip);
 
    private:
-    SDL_Texture* _background = nullptr;
-    SDL_Texture* _fog = nullptr;
+    TexturePtr _background{nullptr, SDL_DestroyTexture};
+    TexturePtr _fog{nullptr, SDL_DestroyTexture};
 
     std::vector<MenuButton> _buttons;
-
 
     float _fogX_1 = 0.0f;
     float _fogX_2 = 0.0f;
