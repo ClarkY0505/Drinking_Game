@@ -5,6 +5,8 @@ project(DrinkingGame
     LANGUAGES CXX
 )
 
+include(CTest)
+
 option(DRINKING_GAME_BUILD_DESKTOP "Build the desktop executable when src/core/main.cpp contains an entry point" ON)
 set(DRINKING_GAME_SDL2_DIR "${SDL2_DIR}" CACHE PATH "Path to a vendored SDL2 source or SDL2 CMake package directory")
 
@@ -100,4 +102,22 @@ if(MSVC)
     target_compile_options(${DRINKING_GAME_TARGET} PRIVATE /W4)
 else()
     target_compile_options(${DRINKING_GAME_TARGET} PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+
+if(BUILD_TESTING AND NOT ANDROID)
+    add_executable(screen_command_compile_test
+        "${DRINKING_GAME_ROOT}/tests/screen_command_compile_test.cpp"
+    )
+
+    target_include_directories(screen_command_compile_test
+        PRIVATE
+            "${DRINKING_GAME_ROOT}/inc"
+    )
+
+    target_link_libraries(screen_command_compile_test
+        PRIVATE
+            ${DRINKING_GAME_SDL2_TARGET}
+    )
+
+    add_test(NAME screen_command_compile_test COMMAND screen_command_compile_test)
 endif()
