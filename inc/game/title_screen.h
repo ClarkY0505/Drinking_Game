@@ -41,7 +41,6 @@ class TitleScreen : public Screen {
    private:
     SDL_Texture* _background = nullptr;
     SDL_Texture* _fog = nullptr;
-    Button _start_btn;
 
     std::vector<MenuButton> _buttons;
 

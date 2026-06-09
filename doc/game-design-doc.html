@@ -1,0 +1,1560 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>热点主机回合制联机游戏 — 纯 C++ 架构设计方案</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --card: #1a1d27;
+    --border: #2a2d3a;
+    --text: #cdd6f4;
+    --muted: #6c7086;
+    --accent: #89b4fa;
+    --green: #a6e3a1;
+    --yellow: #f9e2af;
+    --red: #f38ba8;
+    --code-bg: #181a24;
+    --title: #cba6f7;
+    --indent-1: #2a2d3a;
+    --indent-2: #252838;
+    --indent-3: #222532;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, "Segoe UI", "Noto Sans SC", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.75;
+    padding: 2rem 1.5rem;
+  }
+
+  .container { max-width: 960px; margin: 0 auto; }
+
+  h1 {
+    font-size: 2rem; color: var(--title); text-align: center;
+    margin-bottom: 2.5rem; padding-bottom: 1.5rem;
+    border-bottom: 2px solid var(--border);
+  }
+
+  h2 {
+    font-size: 1.4rem; color: var(--accent);
+    margin: 2.5rem 0 1rem; padding-left: 0.6rem;
+    border-left: 3px solid var(--accent);
+  }
+
+  h3 {
+    font-size: 1.15rem; color: var(--yellow);
+    margin: 1.5rem 0 0.75rem;
+  }
+
+  p { margin: 0.6rem 0; }
+
+  /* ─── 表格通用 ─── */
+  table {
+    width: 100%; border-collapse: collapse;
+    margin: 1rem 0 1.5rem; font-size: 0.92rem;
+  }
+
+  th, td {
+    padding: 0.6rem 0.9rem; text-align: left;
+    border: 1px solid var(--border);
+  }
+
+  th {
+    background: #252836; color: var(--accent);
+    font-weight: 600; white-space: nowrap;
+  }
+
+  td { background: var(--card); }
+  tr:nth-child(even) td { background: #1e2030; }
+
+  /* ─── 架构表格（树形层级） ─── */
+  .arch-table td { vertical-align: top; }
+  .arch-table .layer {
+    font-weight: 700; font-size: 1rem; padding: 0.8rem 1rem;
+  }
+  .arch-table .l1 { background: #1e2a3a; color: var(--accent); }
+  .arch-table .l2 { background: #1e302a; color: var(--green); }
+  .arch-table .l3 { background: #2e2a1e; color: var(--yellow); }
+  .arch-table .l4 { background: #2a1e30; color: var(--title); }
+
+  .arch-table .mod { font-size: 0.85rem; }
+  .arch-table .mod-name { font-weight: 600; color: #e0e0e0; }
+  .arch-table .mod-class { color: var(--muted); font-size: 0.82rem; }
+
+  /* ─── 状态机表格 ─── */
+  .fsm-table .state { font-weight: 700; font-size: 1rem; }
+  .fsm-table .arrow { color: var(--muted); font-size: 1.2rem; text-align: center; width: 3rem; }
+  .fsm-table .condition { color: var(--muted); font-size: 0.85rem; }
+  .fsm-table td:first-child { width: 10rem; }
+
+  /* ─── 帧结构表格 ─── */
+  .frame-table .offset { color: var(--muted); width: 6rem; }
+  .frame-table .data { font-family: "JetBrains Mono", monospace; color: var(--green); }
+  .frame-table .note { color: var(--muted); font-size: 0.85rem; }
+
+  /* ─── 拓扑表格 ─── */
+  .topo-table .role { font-weight: 700; }
+  .topo-table .ip { font-family: "JetBrains Mono", monospace; color: var(--accent); }
+
+  /* ─── 行为树表格 ─── */
+  .bt-table .level { color: var(--muted); width: 4rem; text-align: center; }
+  .bt-table .node { font-family: "JetBrains Mono", monospace; }
+  .bt-table .selector { color: var(--yellow); }
+  .bt-table .sequence { color: var(--accent); }
+  .bt-table .action { color: var(--text); }
+  .bt-table .cond { color: var(--red); }
+
+  /* ─── 目录树表格 ─── */
+  .tree-table .icon { width: 2rem; text-align: center; color: var(--muted); }
+  .tree-table .name { font-family: "JetBrains Mono", monospace; font-size: 0.88rem; }
+  .tree-table .comment { color: var(--muted); font-size: 0.82rem; }
+  .tree-table .dir { color: var(--accent); }
+  .tree-table .file { color: var(--text); }
+  .tree-table .config { color: var(--yellow); }
+
+  /* ─── 消息类型表格 ─── */
+  .msg-cell {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.85rem; color: var(--green); white-space: nowrap;
+  }
+
+  .dir-cell {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.85rem; color: var(--yellow); white-space: nowrap;
+  }
+
+  /* ─── 通用 ─── */
+  pre {
+    background: var(--code-bg); border: 1px solid var(--border);
+    border-radius: 8px; padding: 1rem 1.2rem; overflow-x: auto;
+    font-size: 0.85rem; line-height: 1.6; margin: 1rem 0;
+    color: #bac2de;
+    font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
+  }
+
+  code {
+    font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
+    font-size: 0.88em;
+  }
+
+  p code, li code {
+    background: var(--code-bg); padding: 0.15em 0.4em;
+    border-radius: 4px; color: var(--yellow);
+  }
+
+  ul, ol { margin: 0.5rem 0 0.5rem 1.5rem; }
+  li { margin: 0.25rem 0; }
+
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  .badge {
+    display: inline-block; padding: 0.15em 0.55em;
+    border-radius: 12px; font-size: 0.78rem; font-weight: 600;
+  }
+  .badge-green { background: #1e3a2a; color: var(--green); }
+  .badge-blue  { background: #1e2a3a; color: var(--accent); }
+  .badge-red   { background: #3a1e2a; color: var(--red); }
+  .badge-purple { background: #2a1e3a; color: var(--title); }
+
+  /* ─── 开发流程 ─── */
+  .phase-table td { vertical-align: top; }
+  .phase-table .phase-num {
+    font-size: 1.3rem; font-weight: 800; text-align: center;
+    width: 3rem; color: var(--title);
+  }
+  .phase-table .phase-title { font-weight: 700; font-size: 1rem; }
+  .phase-table .phase-files { font-family: "JetBrains Mono", monospace; font-size: 0.82rem; color: var(--muted); }
+  .phase-table .phase-goal { font-size: 0.9rem; }
+
+  .pipeline-table .step { font-weight: 700; white-space: nowrap; }
+  .pipeline-table .in { font-family: "JetBrains Mono", monospace; color: var(--yellow); font-size: 0.85rem; }
+  .pipeline-table .out { font-family: "JetBrains Mono", monospace; color: var(--green); font-size: 0.85rem; }
+
+  .meta-table th:first-child { width: 10rem; }
+
+  .note-box {
+    background: #1e2a3a; border-left: 3px solid var(--accent);
+    border-radius: 0 8px 8px 0; padding: 0.8rem 1rem; margin: 1rem 0;
+    font-size: 0.9rem;
+  }
+
+  .footer {
+    text-align: center; margin-top: 3rem; padding-top: 1.5rem;
+    border-top: 1px solid var(--border); color: var(--muted); font-size: 0.85rem;
+  }
+
+  .toc {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 8px; padding: 1.2rem 1.5rem; margin: 1.5rem 0;
+  }
+  .toc h3 { margin-top: 0; color: var(--title); }
+  .toc ol { columns: 2; }
+  .toc li { margin: 0.3rem 0; }
+  .toc a { color: var(--text); }
+
+  @media (max-width: 640px) {
+    body { padding: 1rem 0.5rem; font-size: 0.9rem; }
+    pre { padding: 0.8rem; font-size: 0.78rem; }
+    table { font-size: 0.8rem; }
+    .toc ol { columns: 1; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>🎲 热点主机回合制联机游戏<br>纯 C++ 架构设计方案</h1>
+
+<!-- ─── 目录 ─────────────────────────────────────────────────── -->
+<div class="toc">
+  <h3>目录</h3>
+  <ol>
+    <li><a href="#sec-tech">技术选型</a></li>
+    <li><a href="#sec-arch">整体架构</a></li>
+    <li><a href="#sec-topo">网络拓扑</a></li>
+    <li><a href="#sec-proto">网络协议</a></li>
+    <li><a href="#sec-state">服务端状态机</a></li>
+    <li><a href="#sec-dice">骰子系统</a></li>
+    <li><a href="#sec-event">事件引擎（行为树驱动）</a></li>
+    <li><a href="#sec-ui">客户端 UI 架构</a></li>
+    <li><a href="#sec-dir">项目目录结构</a></li>
+    <li><a href="#sec-workflow">模块开发流程</a></li>
+    <li><a href="#sec-order">实现顺序</a></li>
+    <li><a href="#sec-build">编译</a></li>
+    <li><a href="#sec-summary">可行性总结</a></li>
+  </ol>
+</div>
+
+<!-- ─── 1. 技术选型 ───────────────────────────────────────────── -->
+<h2 id="sec-tech">一、技术选型</h2>
+
+<table>
+  <thead>
+    <tr><th>层</th><th>选型</th><th>理由</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>渲染 + 窗口 + 输入</td><td><strong>SDL2</strong></td><td>安卓 / iOS 原生支持，2D 渲染够用，触屏事件直接映射</td></tr>
+    <tr><td>文字渲染</td><td><strong>SDL2_ttf</strong></td><td>TrueType 字体，中文支持</td></tr>
+    <tr><td>图片加载</td><td><strong>SDL2_image</strong></td><td>PNG / JPEG / WebP</td></tr>
+    <tr><td>音频</td><td><strong>SDL2_mixer</strong></td><td>音效 + 背景音乐</td></tr>
+    <tr><td>网络</td><td><strong>POSIX sockets</strong>（select / epoll）</td><td>跨平台，回合制 TCP 足够</td></tr>
+    <tr><td>序列化</td><td><strong>自定义二进制协议</strong></td><td>零依赖，<code>struct</code> + <code>memcpy</code>，单条消息 8-40 字节</td></tr>
+    <tr><td>行为树</td><td><strong>BehaviorTree.CPP</strong></td><td>header-only，MIT 协议</td></tr>
+    <tr><td>构建</td><td><strong>CMake</strong></td><td>Android NDK + iOS toolchain 原生支持</td></tr>
+  </tbody>
+</table>
+
+<p>SDL2 内部已完成 Android <code>SurfaceView</code> / iOS <code>Metal</code> 的桥接，业务代码里只有 <code>SDL_Renderer</code> 和 <code>SDL_Event</code>，不存在平台桥接层。</p>
+
+<div class="note-box">
+  <strong>唯一需要的非 C++ 文件：</strong>Android 的 <code>SDLActivity.java</code>（SDL2 自带）和 iOS 的 <code>main.m</code>（SDL2 自带），无需手写。
+</div>
+
+<!-- ─── 2. 整体架构（表格表示） ────────────────────────────────── -->
+<h2 id="sec-arch">二、整体架构</h2>
+
+<table class="arch-table">
+  <thead>
+    <tr><th style="width:15%">层级</th><th style="width:30%">模块</th><th>说明</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td class="layer l1">接入层</td>
+      <td class="mod">
+        <div class="mod-name">main()</div>
+        <div class="mod-class">C++ 入口</div>
+      </td>
+      <td>
+        解析命令行参数（--host / --join），初始化 SDL2 子系统，启动主循环。<br>
+        同一二进制在主机模式和客户端模式间切换。
+      </td>
+    </tr>
+    <tr>
+      <td class="layer" rowspan="3" style="background:#1e2a3a;color:var(--accent);vertical-align:middle;text-align:center;">UI 层<br>C++</td>
+      <td class="mod">
+        <div class="mod-name">TitleScreen</div>
+        <div class="mod-class">标题界面</div>
+      </td>
+      <td>创建房间 / 加入房间入口</td>
+    </tr>
+    <tr>
+      <td class="mod">
+        <div class="mod-name">LobbyScreen / ClassPickScreen</div>
+        <div class="mod-class">等待 &amp; 选职</div>
+      </td>
+      <td>玩家列表展示 + 三选一职业界面</td>
+    </tr>
+    <tr>
+      <td class="mod">
+        <div class="mod-name">GameScreen / ResultScreen</div>
+        <div class="mod-class">游戏 &amp; 结算</div>
+      </td>
+      <td>主界面：场地、玩家状态、骰子动画、事件展示；结算排名</td>
+    </tr>
+    <tr>
+      <td class="layer" rowspan="4" style="background:#1e302a;color:var(--green);vertical-align:middle;text-align:center;">逻辑层<br>C++</td>
+      <td class="mod">
+        <div class="mod-name">RoomMgr / TurnMgr</div>
+        <div class="mod-class">房间 &amp; 回合</div>
+      </td>
+      <td>管理玩家加入/离开、回合轮转、超时倒计时</td>
+    </tr>
+    <tr>
+      <td class="mod">
+        <div class="mod-name">DiceSystem / ClassSystem</div>
+        <div class="mod-class">骰子 &amp; 职业</div>
+      </td>
+      <td>服务端随机数生成 + 职业属性加成 / 修正值计算</td>
+    </tr>
+    <tr>
+      <td class="mod">
+        <div class="mod-name">EventEngine</div>
+        <div class="mod-class">事件引擎（行为树驱动）</div>
+      </td>
+      <td>加载事件 JSON 配置，根据骰子结果走行为树分支</td>
+    </tr>
+    <tr>
+      <td class="mod">
+        <div class="mod-name">AIPlayer</div>
+        <div class="mod-class">AI 玩家（行为树驱动）</div>
+      </td>
+      <td>单人模式对手 + 超时/掉线托管代理</td>
+    </tr>
+    <tr>
+      <td class="layer" rowspan="2" style="background:#2e2a1e;color:var(--yellow);vertical-align:middle;text-align:center;">网络层<br>C++</td>
+      <td class="mod">
+        <div class="mod-name">GameServer (select/epoll)</div>
+        <div class="mod-class">TCP Server</div>
+      </td>
+      <td>监听 :8888，管理所有客户端连接，广播消息，检测心跳超时</td>
+    </tr>
+    <tr>
+      <td class="mod">
+        <div class="mod-name">GameClient (单连接 TCP)</div>
+        <div class="mod-class">TCP Client</div>
+      </td>
+      <td>连接主机 <code>192.168.43.1:8888</code>，收发消息</td>
+    </tr>
+    <tr>
+      <td class="layer l4">序列化层</td>
+      <td class="mod">
+        <div class="mod-name">Protocol / msg_types.h</div>
+        <div class="mod-class">二进制协议</div>
+      </td>
+      <td>自定义 6 字节帧头 + packed struct payload，零依赖</td>
+    </tr>
+  </tbody>
+</table>
+
+<p style="text-align:center;color:var(--muted);margin-top:0.5rem;">
+  ▼ 回调：UI 层通过函数指针 / std::function 接收逻辑层事件 ▼
+</p>
+
+<!-- ─── 3. 网络拓扑（表格表示） ────────────────────────────────── -->
+<h2 id="sec-topo">三、网络拓扑</h2>
+
+<table class="topo-table">
+  <thead>
+    <tr><th style="width:15%">角色</th><th style="width:25%">IP 地址</th><th style="width:20%">端口</th><th>职责</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td class="role">🎯 主机 (房主)</td>
+      <td class="ip">192.168.43.1</td>
+      <td style="text-align:center">8888 (listen)</td>
+      <td>
+        <strong>手机开热点</strong>，同时运行 <code>GameServer</code> + 自身 <code>GameClient</code><br>
+        所有玩家的消息经此中转 / 裁决
+      </td>
+    </tr>
+    <tr>
+      <td class="role">👤 玩家 1</td>
+      <td class="ip">192.168.43.x</td>
+      <td style="text-align:center">—</td>
+      <td>连接主机 WiFi，Client 连 <code>192.168.43.1:8888</code></td>
+    </tr>
+    <tr>
+      <td class="role">👤 玩家 2</td>
+      <td class="ip">192.168.43.x</td>
+      <td style="text-align:center">—</td>
+      <td>同上</td>
+    </tr>
+    <tr>
+      <td class="role">👤 玩家 3</td>
+      <td class="ip">192.168.43.x</td>
+      <td style="text-align:center">—</td>
+      <td>同上</td>
+    </tr>
+    <tr>
+      <td class="role">👤 玩家 4 ~ 5</td>
+      <td class="ip">192.168.43.x</td>
+      <td style="text-align:center">—</td>
+      <td>同上（最多 6 人）</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="note-box">
+  <strong>热点 IP：</strong>Android 热点默认 DHCP 网段 <code>192.168.43.0/24</code>，主机自身固定为 <code>192.168.43.1</code>。客户端无需手动输 IP，可通过 UDP 广播（<code>255.255.255.255</code>）在局域网内自动发现主机。
+</div>
+
+<!-- ─── 4. 网络协议 ───────────────────────────────────────────── -->
+<h2 id="sec-proto">四、网络协议（自定义二进制）</h2>
+
+<h3>4.1 选型理由</h3>
+
+<table>
+  <thead>
+    <tr><th>对比维度</th><th>JSON 文本</th><th>自定义二进制</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>依赖</td><td>需要 nlohmann/json</td><td style="color:var(--green)"><strong>零依赖，纯 C++ <code>struct</code> + <code>memcpy</code></strong></td></tr>
+    <tr><td>单条消息大小</td><td>80-200 字节</td><td style="color:var(--green)"><strong>8-40 字节</strong></td></tr>
+    <tr><td>解析开销</td><td>字符串解析 + 内存分配</td><td style="color:var(--green)"><strong>直接强转 struct 指针</strong></td></tr>
+    <tr><td>调试</td><td>肉眼可读</td><td>hexdump + 对照表，或写 <code>to_string()</code></td></tr>
+    <tr><td>扩展性</td><td>随意加字段</td><td>新增消息类型即可，老类型不变</td></tr>
+  </tbody>
+</table>
+
+<p>回合制总共 14 条消息，二进制协议手写不超过 200 行代码。</p>
+
+<h3>4.2 统一帧格式</h3>
+
+<table class="frame-table">
+  <thead>
+    <tr><th>偏移</th><th>字节数</th><th>字段</th><th>说明</th></tr>
+  </thead>
+  <tbody>
+    <tr><td class="offset">0x00</td><td style="text-align:center">2</td><td class="data">msg_len</td><td class="note">整个帧的字节数（含自身），大端 uint16_t</td></tr>
+    <tr><td class="offset">0x02</td><td style="text-align:center">2</td><td class="data">msg_type</td><td class="note">消息类型枚举，大端 uint16_t</td></tr>
+    <tr><td class="offset">0x04</td><td style="text-align:center">1</td><td class="data">player_id</td><td class="note">发送者 ID（0=server, 1-6=玩家）</td></tr>
+    <tr><td class="offset">0x05</td><td style="text-align:center">1</td><td class="data">flags</td><td class="note">bit0=需要ACK，bit1=广播标记，其余保留</td></tr>
+    <tr><td class="offset">0x06</td><td style="text-align:center">N</td><td class="data">payload</td><td class="note">各消息类型自定义（见 4.4）</td></tr>
+  </tbody>
+</table>
+
+<h3>4.3 msg_types.h</h3>
+
+<pre>#pragma once
+#include &lt;cstdint&gt;
+
+enum class MsgType : uint16_t {
+    // 房间阶段
+    JOIN_REQ      = 0x0100,
+    JOIN_ACK      = 0x0101,
+    CLASS_OPT     = 0x0102,
+    CLASS_PICK    = 0x0103,
+    CLASS_CONF    = 0x0104,
+    // 回合阶段
+    TURN_START    = 0x0200,
+    ACTION_REQ    = 0x0201,
+    DICE_ROLL     = 0x0202,
+    EVENT_FIRE    = 0x0203,
+    TURN_END      = 0x0204,
+    // 系统
+    HEARTBEAT     = 0xFF00,
+    HEARTBEAT_ACK = 0xFF01,
+    PLAYER_DC     = 0xFF02,
+    GAME_OVER     = 0xFF03,
+};
+
+// 统一帧头，6 字节
+struct __attribute__((packed)) FrameHeader {
+    uint16_t msg_len;    // 含头部的帧总长
+    uint16_t msg_type;
+    uint8_t  player_id;
+    uint8_t  flags;
+};
+static_assert(sizeof(FrameHeader) == 6, "FrameHeader must be 6 bytes");</pre>
+
+<h3>4.4 protocol.h 读写接口</h3>
+
+<pre>// 发送端：把各消息的 Payload struct 包进帧头
+template&lt;typename Payload&gt;
+std::vector&lt;uint8_t&gt; pack(MsgType type, uint8_t player_id,
+                           uint8_t flags, const Payload&amp; payload) {
+    uint16_t total = sizeof(FrameHeader) + sizeof(Payload);
+    std::vector&lt;uint8_t&gt; buf(total);
+    auto* hdr = reinterpret_cast&lt;FrameHeader*&gt;(buf.data());
+    hdr-&gt;msg_len   = htons(total);
+    hdr-&gt;msg_type  = htons(static_cast&lt;uint16_t&gt;(type));
+    hdr-&gt;player_id = player_id;
+    hdr-&gt;flags     = flags;
+    std::memcpy(buf.data() + sizeof(FrameHeader), &amp;payload, sizeof(Payload));
+    return buf;
+}
+
+// 空 payload 消息 (HEARTBEAT 等)
+inline std::vector&lt;uint8_t&gt; pack(MsgType type, uint8_t player_id, uint8_t flags) {
+    uint16_t total = sizeof(FrameHeader);
+    std::vector&lt;uint8_t&gt; buf(total);
+    auto* hdr = reinterpret_cast&lt;FrameHeader*&gt;(buf.data());
+    hdr-&gt;msg_len   = htons(total);
+    hdr-&gt;msg_type  = htons(static_cast&lt;uint16_t&gt;(type));
+    hdr-&gt;player_id = player_id;
+    hdr-&gt;flags     = flags;
+    return buf;
+}
+
+// 接收端：从帧头指针取出 payload
+template&lt;typename Payload&gt;
+const Payload&amp; unpack_payload(const FrameHeader* hdr) {
+    return *reinterpret_cast&lt;const Payload*&gt;(
+        reinterpret_cast&lt;const uint8_t*&gt;(hdr) + sizeof(FrameHeader));
+}</pre>
+
+<p><strong>接收分帧：</strong></p>
+
+<pre>void on_recv(int fd) {
+    uint8_t len_buf[2];
+    recv(fd, len_buf, 2, MSG_WAITALL);
+    uint16_t total = ntohs(*reinterpret_cast&lt;uint16_t*&gt;(len_buf));
+
+    std::vector&lt;uint8_t&gt; buf(total);
+    std::memcpy(buf.data(), len_buf, 2);
+    recv(fd, buf.data() + 2, total - 2, MSG_WAITALL);
+
+    auto* hdr = reinterpret_cast&lt;FrameHeader*&gt;(buf.data());
+    dispatch(hdr);  // 根据 msg_type 路由
+}</pre>
+
+<h3>4.5 每条消息的 Payload 定义</h3>
+
+<p><span class="badge badge-green">房间阶段</span></p>
+
+<table>
+  <thead>
+    <tr><th style="width:16%">消息</th><th>Payload struct</th><th style="width:8%">大小</th><th>说明</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td class="msg-cell">JOIN_REQ</td>
+      <td><code>{ uint8_t name_len; char name[32]; }</code></td>
+      <td style="text-align:center">33B</td>
+      <td>C→S，玩家昵称（UTF-8）</td>
+    </tr>
+    <tr>
+      <td class="msg-cell">JOIN_ACK</td>
+      <td><code>{ uint8_t your_id; uint8_t count; struct { uint8_t id; char name[32]; } players[6]; }</code></td>
+      <td style="text-align:center">200B</td>
+      <td>S→C，分配 ID + 当前玩家列表</td>
+    </tr>
+    <tr>
+      <td class="msg-cell">CLASS_OPT</td>
+      <td><code>{ uint8_t classes[3]; }</code></td>
+      <td style="text-align:center">3B</td>
+      <td>S→C，3 个职业 ID</td>
+    </tr>
+    <tr>
+      <td class="msg-cell">CLASS_PICK</td>
+      <td><code>{ uint8_t class_id; }</code></td>
+      <td style="text-align:center">1B</td>
+      <td>C→S，玩家选择</td>
+    </tr>
+    <tr>
+      <td class="msg-cell">CLASS_CONF</td>
+      <td><code>{ uint8_t player_id; uint8_t class_id; }</code></td>
+      <td style="text-align:center">2B</td>
+      <td>S→广播</td>
+    </tr>
+  </tbody>
+</table>
+
+<p><span class="badge badge-blue">回合阶段</span></p>
+
+<table>
+  <thead>
+    <tr><th style="width:16%">消息</th><th>Payload struct</th><th style="width:8%">大小</th><th>说明</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td class="msg-cell">TURN_START</td>
+      <td><code>{ uint8_t player_id; uint16_t turn_num; }</code></td>
+      <td style="text-align:center">3B</td>
+      <td>S→广播</td>
+    </tr>
+    <tr>
+      <td class="msg-cell">ACTION_REQ</td>
+      <td><code>{ uint8_t action; uint8_t target; }</code></td>
+      <td style="text-align:center">2B</td>
+      <td>C→S，action=0探索,1攻击,2技能,3道具</td>
+    </tr>
+    <tr>
+      <td class="msg-cell">DICE_ROLL</td>
+      <td><code>{ uint8_t p; uint8_t n; uint8_t d[6]; int16_t mod; int16_t total; }</code></td>
+      <td style="text-align:center">12B</td>
+      <td>S→广播</td>
+    </tr>
+    <tr>
+      <td class="msg-cell">EVENT_FIRE</td>
+      <td><code>{ uint16_t event_id; uint8_t n; struct { uint8_t t; int16_t v; } eff[4]; }</code></td>
+      <td style="text-align:center">14B</td>
+      <td>S→广播</td>
+    </tr>
+    <tr>
+      <td class="msg-cell">TURN_END</td>
+      <td><code>{ uint8_t player_id; }</code></td>
+      <td style="text-align:center">1B</td>
+      <td>S→广播</td>
+    </tr>
+  </tbody>
+</table>
+
+<p><span class="badge badge-red">系统消息</span></p>
+
+<table>
+  <thead>
+    <tr><th style="width:22%">消息</th><th>Payload struct</th><th style="width:8%">大小</th><th>说明</th></tr>
+  </thead>
+  <tbody>
+    <tr><td class="msg-cell">HEARTBEAT</td><td>无 payload</td><td style="text-align:center">0B</td><td>C→S，每 1 秒</td></tr>
+    <tr><td class="msg-cell">HEARTBEAT_ACK</td><td>无 payload</td><td style="text-align:center">0B</td><td>S→C</td></tr>
+    <tr><td class="msg-cell">PLAYER_DC</td><td><code>{ uint8_t player_id; }</code></td><td style="text-align:center">1B</td><td>S→广播</td></tr>
+    <tr><td class="msg-cell">GAME_OVER</td><td><code>{ uint8_t winner; uint8_t n; struct { uint8_t id; int16_t score; } r[6]; }</code></td><td style="text-align:center">20B</td><td>S→广播</td></tr>
+  </tbody>
+</table>
+
+<h3>4.6 示例：ACTION_REQ → DICE_ROLL 的线缆字节</h3>
+
+<pre>Client → Server (ACTION_REQ):
+  raw hex: 00 08  02 01  03  00  00 03
+           ─────  ─────  ──  ──  ── ──
+           len=8  ACT_REQ id=3 flg action=探索 target=地牢
+
+Server → Broadcast (DICE_ROLL):
+  raw hex: 00 12  02 02  00  01  02  06 03 01  00 02  00 0c
+           ─────  ─────  ──  ──  ──  ── ──────  ─────  ─────
+           len=18 DICE    id=0 flg=1 plyr=2 骰[6,3,1] mod=+2 total=12</pre>
+
+<h3>4.7 调试用 to_string()</h3>
+
+<pre>const char* msg_type_name(uint16_t type) {
+    switch (static_cast&lt;MsgType&gt;(type)) {
+        case MsgType::JOIN_REQ:  return "JOIN_REQ";
+        case MsgType::JOIN_ACK:  return "JOIN_ACK";
+        case MsgType::DICE_ROLL: return "DICE_ROLL";
+        // ...
+        default: return "UNKNOWN";
+    }
+}
+
+void hexdump(const uint8_t* data, size_t len) {
+    for (size_t i = 0; i &lt; len; i++) {
+        printf("%02x ", data[i]);
+        if ((i + 1) % 16 == 0) printf("\n");
+    }
+    printf("\n");
+}</pre>
+
+<div class="note-box">
+  <strong>调试提示：</strong>P0 阶段写一个命令行工具 <code>./debug --decode hex.bin</code> 把二进制帧转成人类可读文本，比 JSON 的肉眼可读性差一点但完全能调试。
+</div>
+
+<!-- ─── 5. 服务端状态机（表格表示） ────────────────────────────── -->
+<h2 id="sec-state">五、服务端核心状态机</h2>
+
+<table class="fsm-table">
+  <thead>
+    <tr><th>状态</th><th>说明</th><th>触发进入下一状态的条件</th><th>超时处理</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td class="state" style="color:var(--accent)">WAITING</td>
+      <td>房间创建，等待玩家加入。每有人加入广播玩家列表更新。</td>
+      <td class="condition">房主点击"开始"<br>或所有玩家发送 ready</td>
+      <td>—</td>
+    </tr>
+    <tr><td colspan="4" style="text-align:center;background:#252836;">⬇ 所有人 ready 或房主开始</td></tr>
+    <tr>
+      <td class="state" style="color:var(--yellow)">PICKING</td>
+      <td>并行选职业。每人从随机 3 个职业中选 1 个。</td>
+      <td class="condition">所有人选定职业</td>
+      <td>20 秒 → 随机分配</td>
+    </tr>
+    <tr><td colspan="4" style="text-align:center;background:#252836;">⬇ 所有人选定 或 超时</td></tr>
+    <tr>
+      <td class="state" style="color:var(--green)">PLAYING</td>
+      <td>
+        回合循环阶段。<br>
+        当前行动玩家执行：投骰子 → 触发事件 → 结算。<br>
+        然后切换到下一个玩家。
+      </td>
+      <td class="condition">触发结束条件<br>（N 轮后 / 仅剩 1 人存活 / 目标达成）</td>
+      <td>每人 30 秒 → AI 托管</td>
+    </tr>
+    <tr><td colspan="4" style="text-align:center;background:#252836;">⬇ 触发结束条件</td></tr>
+    <tr>
+      <td class="state" style="color:var(--red)">RESULT</td>
+      <td>结算界面。展示排名、统计、回顾。</td>
+      <td class="condition">房主发起新一局<br>或所有人返回大厅</td>
+      <td>—</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>服务端核心骨架</h3>
+
+<pre>class GameServer {
+public:
+    enum State { WAITING, PICKING, PLAYING, RESULT };
+
+    void on_player_join(int fd, const JoinReq&amp; req);
+    void on_class_pick(int player_id, const ClassPick&amp; pick);
+    void on_action(int player_id, const ActionReq&amp; action);
+    void tick();  // 每 100ms 调用一次，处理超时
+
+private:
+    State m_state = WAITING;
+    int m_current_player = 0;
+    int m_turn_number = 0;
+
+    vector&lt;Player&gt; m_players;         // 最多 6 人
+    DiceSystem m_dice;
+    EventEngine m_events;             // 行为树驱动
+    AIPlayer m_ai;                    // 托管掉线 / 超时玩家
+
+    int m_action_timer = 0;           // 倒计时，单位 100ms
+    static constexpr int ACTION_TIMEOUT = 300;  // 30 秒
+
+    void next_turn();
+    void resolve_action(int player_id, const ActionReq&amp; action);
+    void broadcast(MsgType type, uint8_t flags, const uint8_t* payload, size_t len,
+                   int exclude_fd = -1);
+    template&lt;typename P&gt; void broadcast(MsgType t, uint8_t f, const P&amp; p, int ex = -1) {
+        broadcast(t, f, reinterpret_cast&lt;const uint8_t*&gt;(&amp;p), sizeof(P), ex);
+    }
+    void send_to(int player_id, MsgType type, uint8_t flags,
+                 const uint8_t* payload, size_t len);
+    template&lt;typename P&gt; void send_to(int pid, MsgType t, uint8_t f, const P&amp; p) {
+        send_to(pid, t, f, reinterpret_cast&lt;const uint8_t*&gt;(&amp;p), sizeof(P));
+    }
+};</pre>
+
+<!-- ─── 6. 骰子系统 ─────────────────────────────────────────────── -->
+<h2 id="sec-dice">六、骰子系统</h2>
+
+<pre>class DiceSystem {
+public:
+    struct RollResult {
+        vector&lt;int&gt; values;     // 每个骰子的值
+        int total;              // 总和
+        int modifier;           // 修正值（来自职业 / 装备 / 状态）
+        int final_value;        // total + modifier
+    };
+
+    RollResult roll(int dice_count, int faces,
+                    const Player&amp; player,
+                    const string&amp; context);  // context = "combat" / "explore" / "event"
+private:
+    mt19937 m_rng;
+};</pre>
+
+<ul>
+  <li>服务端生成，客户端只做展示</li>
+  <li>修正值由职业、装备、状态 buff / debuff 决定</li>
+  <li><code>context</code> 参数影响某些职业天赋是否触发</li>
+</ul>
+
+<!-- ─── 7. 事件引擎 ─────────────────────────────────────────────── -->
+<h2 id="sec-event">七、事件引擎（行为树驱动）</h2>
+
+<div class="note-box">
+  <strong>为什么逻辑层不需要 JSON：</strong>事件配置本质上就是一个阈值查表——给定骰子值，返回对应的事件 ID 和效果列表。这用 C++ <code>constexpr</code> 数组表达最直接，编译进二进制，零解析开销。BehaviorTree.CPP 的行为树结构（AI 决策树、事件分支树）仍然用 XML 文件——那是 BT 库的原生格式，不算额外依赖。
+</div>
+
+<h3>7.1 事件数据：纯 C++ constexpr</h3>
+
+<pre>// event_data.h — 所有事件配置，编译时即确定，无需解析任何外部文件
+#pragma once
+#include &lt;cstdint&gt;
+
+enum class EffectType : uint8_t { GOLD = 0, ITEM, COMBAT, DMG, HEAL, BUFF };
+
+struct Effect {
+    EffectType type;
+    int16_t    value;       // 金币数 / 物品ID / 怪物ID / HP变化量 / buff ID
+};
+
+struct EventThreshold {
+    int16_t  min_roll;      // 骰子最终值 >= 此值则触发
+    uint16_t event_id;
+    const char* desc;       // 仅用于 UI 展示，不参与逻辑
+    Effect    effects[4];   // 最多 4 个效果
+    uint8_t   effect_count;
+};
+
+struct EventTemplate {
+    uint16_t            event_id;
+    const char*         name;
+    uint8_t             dice_count;
+    uint8_t             dice_faces;
+    EventThreshold      thresholds[4];  // 按 min_roll 降序排列
+    uint8_t             threshold_count;
+};
+
+// ═══════════════════════════════════════════════════════════
+// 事件数据库 — 添加新事件只在这里加一行
+// ═══════════════════════════════════════════════════════════
+constexpr EventTemplate EVENT_DB[] = {
+    {
+        0x0001, "tomb_explore", 2, 6,
+        {{
+            {15, 0x1001, "发现黄金宝箱", {{EffectType::GOLD, 100}, {EffectType::ITEM, 1}}, 2},
+            {8,  0x1002, "木乃伊突袭",   {{EffectType::COMBAT, 3}}, 1},
+            {0,  0x1003, "毒气陷阱",     {{EffectType::DMG, -15}}, 1},
+        }}, 3
+    },
+    {
+        0x0002, "forest_wander", 1, 6,
+        {{
+            {5, 0x2001, "发现草药", {{EffectType::HEAL, 10}}, 1},
+            {3, 0x2002, "遇到旅人", {{EffectType::GOLD, 20}}, 1},
+            {0, 0x2003, "荆棘划伤", {{EffectType::DMG, -5}}, 1},
+        }}, 3
+    },
+    // 继续添加更多事件...
+};
+
+constexpr size_t EVENT_DB_SIZE = sizeof(EVENT_DB) / sizeof(EVENT_DB[0]);</pre>
+
+<h3>7.2 事件引擎查询</h3>
+
+<pre>// event_engine.h
+class EventEngine {
+public:
+    // 根据骰子最终值查找触发哪个事件
+    const EventThreshold* resolve(uint16_t event_id, int16_t final_roll) const {
+        const auto* tmpl = find_template(event_id);
+        if (!tmpl) return nullptr;
+        // thresholds 已按 min_roll 降序排列，找到第一个满足的
+        for (int i = 0; i &lt; tmpl-&gt;threshold_count; i++) {
+            if (final_roll &gt;= tmpl-&gt;thresholds[i].min_roll) {
+                return &amp;tmpl-&gt;thresholds[i];
+            }
+        }
+        return nullptr;  // 不应到达，最后一个 threshold 的 min 总是 0
+    }
+
+    const EventTemplate* find_template(uint16_t event_id) const {
+        for (size_t i = 0; i &lt; EVENT_DB_SIZE; i++) {
+            if (EVENT_DB[i].event_id == event_id) return &amp;EVENT_DB[i];
+        }
+        return nullptr;
+    }
+};</pre>
+
+<h3>7.3 行为树节点</h3>
+
+<p>事件<strong>分支连线</strong>仍是行为树的职责。以下是 BehaviorTree.CPP 的 XML + C++ Action 节点：</p>
+
+<pre>// TombExplore 行为树 Action 节点
+class TombExplore : public BT::SyncActionNode {
+public:
+    BT::NodeStatus tick() override {
+        auto&amp; player  = config().blackboard-&gt;get&lt;Player&gt;("player");
+        int roll      = config().blackboard-&gt;get&lt;int&gt;("dice_result");
+        uint16_t evt  = config().blackboard-&gt;get&lt;uint16_t&gt;("event_id");
+
+        EventEngine engine;
+        const auto* threshold = engine.resolve(evt, roll);
+        if (!threshold) return BT::NodeStatus::FAILURE;
+
+        // 把匹配到的效果写入黑板，供子节点消费
+        config().blackboard-&gt;set("matched_effects", threshold-&gt;effects);
+        config().blackboard-&gt;set("matched_count",   threshold-&gt;effect_count);
+        config().blackboard-&gt;set("event_desc",      threshold-&gt;desc);
+
+        return BT::NodeStatus::SUCCESS;  // 继续走子行为树
+    }
+};</pre>
+
+<p><strong>XML 连线（BehaviorTree.CPP 原生格式）：</strong></p>
+
+<pre>&lt;root&gt;
+  &lt;BehaviorTree ID="tomb_explore"&gt;
+    &lt;Sequence&gt;
+      &lt;TombExplore event_id="0x0001"/&gt;
+      &lt;Switch4 case_0="treasure" case_1="combat" case_2="trap" variable="matched_effects"/&gt;
+    &lt;/Sequence&gt;
+  &lt;/BehaviorTree&gt;
+&lt;/root&gt;</pre>
+
+<h3>7.4 数据流总结</h3>
+
+<table class="meta-table">
+  <thead>
+    <tr><th style="width:10%">步骤</th><th>执行方</th><th>动作</th><th>输出</th></tr>
+  </thead>
+  <tbody>
+    <tr><td style="text-align:center">1</td><td>TurnMgr</td><td>决定本轮大事件</td><td class="msg-cell">event_id = 0x0001</td></tr>
+    <tr><td style="text-align:center">2</td><td>DiceSystem</td><td>投骰并加职业修正</td><td class="msg-cell">final_roll = 12</td></tr>
+    <tr><td style="text-align:center">3</td><td>EventEngine</td><td>resolve(0x0001, 12) → 查 EVENT_DB[0]</td><td class="msg-cell">12 ≥ 8 → "木乃伊突袭" (0x1002)</td></tr>
+    <tr><td style="text-align:center">4</td><td>EventEngine</td><td>提取效果列表</td><td class="msg-cell">Effect[] = [{COMBAT, 3}]</td></tr>
+    <tr><td style="text-align:center">5</td><td>BT::BehaviorTree</td><td>tick 战斗子行为树</td><td class="msg-cell">进入战斗(敌方 ID=3 木乃伊)</td></tr>
+    <tr><td style="text-align:center">6</td><td>Server</td><td>broadcast EVENT_FIRE</td><td class="msg-cell">二进制帧 → 所有客户端</td></tr>
+  </tbody>
+</table>
+
+<h3>7.5 三种数据的存储方式</h3>
+
+<table>
+  <thead>
+    <tr><th>是什么</th><th>存储方式</th><th>理由</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>事件阈值 + 效果数据</td><td>C++ <code>constexpr</code> 数组</td><td>纯数据，编译时确定，无解析</td></tr>
+    <tr><td>AI 决策树结构</td><td>BehaviorTree.CPP XML（BT 库原生）</td><td>行为树库自带能力，不算额外依赖</td></tr>
+    <tr><td>网络传输</td><td>二进制 packed struct</td><td>见第四章</td></tr>
+  </tbody>
+</table>
+
+<div class="note-box">
+  <strong>没有 JSON 依赖。</strong>事件内容直接改 C++ 源码（<code>EVENT_DB[]</code> 数组），重新编译即可。AI 行为树连线改 XML（BehaviorTree.CPP 原生格式，无额外解析器）。
+</div>
+
+<h3>7.6 AI 行为树</h3>
+
+<table class="bt-table">
+  <thead>
+    <tr><th style="width:8%">层级</th><th style="width:22%">节点类型</th><th style="width:30%">行为</th><th>触发条件</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td class="level">L0</td>
+      <td class="node selector">Selector</td>
+      <td><strong>我的回合要做什么？</strong></td>
+      <td>每次 AI 回合入口</td>
+    </tr>
+    <tr>
+      <td class="level">L1</td>
+      <td class="node sequence">Sequence</td>
+      <td>紧急自保</td>
+      <td class="cond">血量 &lt; 20%</td>
+    </tr>
+    <tr>
+      <td class="level">L2</td>
+      <td class="node action">Action</td>
+      <td>检查是否有治疗道具</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td class="level">L2</td>
+      <td class="node action">Action</td>
+      <td>使用治疗道具</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td class="level">L1</td>
+      <td class="node sequence">Sequence</td>
+      <td>激进进攻</td>
+      <td class="cond">敌人血量 &lt; 30%</td>
+    </tr>
+    <tr>
+      <td class="level">L2</td>
+      <td class="node action">Action</td>
+      <td>选择伤害最高的技能</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td class="level">L2</td>
+      <td class="node action">Action</td>
+      <td>攻击残血目标</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td class="level">L1</td>
+      <td class="node sequence">Sequence</td>
+      <td>默认保守行动</td>
+      <td class="cond">以上均不满足</td>
+    </tr>
+    <tr>
+      <td class="level">L2</td>
+      <td class="node action">Action</td>
+      <td>评估场上威胁等级</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td class="level">L2</td>
+      <td class="node action">Action</td>
+      <td>选择最优目标，普通攻击</td>
+      <td>—</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>行为树三个应用场景：</p>
+<ol>
+  <li><strong>AI 玩家</strong> — 单人模式 / 审核模式下的对手</li>
+  <li><strong>事件分支</strong> — 根据骰子结果走不同事件链</li>
+  <li><strong>超时托管</strong> — 玩家掉线或行动超时，AI 代操作</li>
+</ol>
+
+<!-- ─── 8. 客户端 UI ────────────────────────────────────────────── -->
+<h2 id="sec-ui">八、客户端 UI 架构</h2>
+
+<h3>8.1 Screen 基类</h3>
+
+<pre>class Screen {
+public:
+    virtual ~Screen() = default;
+    virtual void on_enter() = 0;
+    virtual void on_exit() = 0;
+    virtual void on_event(const SDL_Event&amp; e) = 0;
+    virtual void on_update(float dt) = 0;
+    virtual void on_render(SDL_Renderer* r) = 0;
+};
+
+class ScreenManager {
+    stack&lt;unique_ptr&lt;Screen&gt;&gt; m_screens;
+public:
+    void push(unique_ptr&lt;Screen&gt; s) { s-&gt;on_enter(); m_screens.push(move(s)); }
+    void pop() { m_screens.top()-&gt;on_exit(); m_screens.pop(); }
+    Screen* current() { return m_screens.top().get(); }
+};</pre>
+
+<h3>8.2 界面清单</h3>
+
+<table>
+  <thead>
+    <tr><th style="width:25%">Screen</th><th style="width:30%">功能</th><th>生命周期</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td class="msg-cell">TitleScreen</td>
+      <td>标题 + "创建房间" / "加入房间"</td>
+      <td>启动 → 初始化完成</td>
+    </tr>
+    <tr>
+      <td class="msg-cell">LobbyScreen</td>
+      <td>当前玩家列表 + 等待开始</td>
+      <td>连接成功 → 游戏开始</td>
+    </tr>
+    <tr>
+      <td class="msg-cell">ClassPickScreen</td>
+      <td>显示 3 个随机职业，点击选择</td>
+      <td>游戏开始 → 选完职业</td>
+    </tr>
+    <tr>
+      <td class="msg-cell">GameScreen</td>
+      <td>游戏主界面：场地、玩家状态、骰子动画、事件展示</td>
+      <td>选职结束 → 结算</td>
+    </tr>
+    <tr>
+      <td class="msg-cell">ResultScreen</td>
+      <td>结算排名 + 统计 + 再来一局</td>
+      <td>游戏结束 → 返回大厅</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>8.3 主循环</h3>
+
+<pre>int main(int argc, char* argv[]) {
+    SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
+    TTF_Init();
+
+    auto window   = SDL_CreateWindow("Game", SDL_WINDOWPOS_CENTERED,
+                                      SDL_WINDOWPOS_CENTERED, 1280, 720, 0);
+    auto renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+
+    ScreenManager screens;
+    GameClient   client;
+
+    // 解析命令行参数决定角色：主机 or 客户端
+    if (is_host) {
+        client.start_server(8888);
+    }
+    client.connect("192.168.43.1", 8888);
+
+    screens.push(make_unique&lt;TitleScreen&gt;(client));
+
+    bool running = true;
+    Uint32 last_tick = SDL_GetTicks();
+    while (running) {
+        Uint32 now = SDL_GetTicks();
+        float dt = (now - last_tick) / 1000.0f;
+        last_tick = now;
+
+        SDL_Event e;
+        while (SDL_PollEvent(&e)) {
+            if (e.type == SDL_QUIT) running = false;
+            screens.current()-&gt;on_event(e);
+        }
+
+        client.poll();                        // 处理网络消息
+        screens.current()-&gt;on_update(dt);
+        SDL_RenderClear(renderer);
+        screens.current()-&gt;on_render(renderer);
+        SDL_RenderPresent(renderer);
+    }
+
+    SDL_Quit();
+    return 0;
+}</pre>
+
+<h3>8.4 像素渲染层：新增文件</h3>
+
+<table class="tree-table">
+  <thead><tr><th style="width:45%">路径</th><th style="width:12%">类型</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td class="name file" style="padding-left:1.5rem">├── sprite.h / .cpp</td><td>📄 C++</td><td>单帧精灵：纹理 + 源矩形 + 目标矩形 + 缩放</td></tr>
+    <tr><td class="name file" style="padding-left:1.5rem">├── sprite_anim.h / .cpp</td><td>📄 C++</td><td>帧动画：多帧轮播（idle / walk / attack / hurt）</td></tr>
+    <tr><td class="name file" style="padding-left:1.5rem">├── tilemap.h / .cpp</td><td>📄 C++</td><td>瓦片地图：int[][] 数据 + 纹理集 → 一次绘制</td></tr>
+    <tr><td class="name file" style="padding-left:1.5rem">└── character.h / .cpp</td><td>📄 C++</td><td>像素角色：SpriteAnim + HP 条 + 名字标签</td></tr>
+  </tbody>
+</table>
+
+<h3>8.5 Sprite &amp; SpriteAnim</h3>
+
+<pre>// sprite.h
+struct Sprite {
+    SDL_Texture* tex = nullptr;
+    SDL_Rect     src = {};        // 精灵表中的像素矩形
+    SDL_Rect     dst = {};        // 屏幕位置 + 缩放后大小
+    int          scale = 3;       // 16x16 → 48x48
+
+    void draw(SDL_Renderer* r) {
+        if (tex) SDL_RenderCopy(r, tex, &amp;src, &amp;dst);
+    }
+
+    static Sprite make(SDL_Texture* t, int src_x, int src_y,
+                       int dst_x, int dst_y, int scale = 3) {
+        return {t, {src_x, src_y, 16, 16},
+                {dst_x, dst_y, 16 * scale, 16 * scale}, scale};
+    }
+};
+
+// sprite_anim.h
+class SpriteAnim {
+    const Sprite* m_frames;
+    int m_count, m_index = 0;
+    float m_timer = 0, m_interval = 0.15f;
+    bool m_loop = true, m_done = false;
+public:
+    SpriteAnim(const Sprite* frames, int count, float interval = 0.15f)
+        : m_frames(frames), m_count(count), m_interval(interval) {}
+
+    void update(float dt) {
+        if (m_done) return;
+        m_timer += dt;
+        if (m_timer >= m_interval) {
+            m_timer -= m_interval;
+            if (++m_index >= m_count)
+                m_loop ? m_index = 0 : (m_index = m_count - 1, m_done = true);
+        }
+    }
+
+    void draw(SDL_Renderer* r) {
+        Sprite s = m_frames[m_index];
+        s.dst = m_frames[0].dst;   // 保持屏幕位置不变
+        s.draw(r);
+    }
+
+    void set_loop(bool l) { m_loop = l; }
+    bool is_done() const { return m_done; }
+    void reset() { m_index = 0; m_timer = 0; m_done = false; }
+};</pre>
+
+<h3>8.6 Tilemap &amp; Character</h3>
+
+<pre>// tilemap.h — 瓦片地图
+class Tilemap {
+    SDL_Texture* m_tex;
+    int m_cols, m_rows, m_scale = 3;
+    vector&lt;int&gt; m_data;     // tile_id, 0 = 空
+public:
+    Tilemap(SDL_Texture* t, int cols, int rows) : m_tex(t), m_cols(cols), m_rows(rows), m_data(cols*rows) {}
+
+    void set(int c, int r, int id) { m_data[r * m_cols + c] = id; }
+
+    void draw(SDL_Renderer* r) {
+        int ts = 16 * m_scale;
+        SDL_Rect src = {0,0,16,16}, dst = {0,0,ts,ts};
+        for (int y = 0; y &lt; m_rows; y++)
+            for (int x = 0; x &lt; m_cols; x++) {
+                int id = m_data[y * m_cols + x];
+                if (!id--) continue;
+                src.x = (id % 16) * 16; src.y = (id / 16) * 16;
+                dst.x = x * ts; dst.y = y * ts;
+                SDL_RenderCopy(r, m_tex, &amp;src, &amp;dst);
+            }
+    }
+};
+
+// character.h — 像素角色
+enum class CharState { IDLE, WALK, ATTACK, HURT };
+
+class Character {
+    SpriteAnim *m_idle, *m_walk, *m_attack, *m_hurt, *m_current;
+    CharState m_state = CharState::IDLE;
+    int m_x, m_y, m_hp, m_max_hp;
+    const char* m_name;
+public:
+    int y() const { return m_y; }  // 用于排序遮挡
+
+    void set_state(CharState s) {
+        if (m_state == s) return;
+        m_state = s;
+        switch (s) {
+            case CharState::IDLE:   m_current = m_idle;   break;
+            case CharState::WALK:   m_current = m_walk;   break;
+            case CharState::ATTACK: m_current = m_attack; m_attack->set_loop(false); m_attack->reset(); break;
+            case CharState::HURT:   m_current = m_hurt;   break;
+        }
+    }
+
+    void update(float dt) { m_current->update(dt); }
+    void draw(SDL_Renderer* r) { m_current->draw(r); draw_hp(r); draw_name(r); }
+};</pre>
+
+<h3>8.7 渲染管线 &amp; 精灵表布局</h3>
+
+<p>GameScreen::on_render() 按层绘制：</p>
+
+<table class="meta-table">
+  <thead><tr><th style="width:8%">层</th><th>内容</th><th>渲染方式</th></tr></thead>
+  <tbody>
+    <tr><td style="text-align:center">1</td><td>瓦片地图</td><td><code>Tilemap::draw()</code></td></tr>
+    <tr><td style="text-align:center">2</td><td>角色（按 Y 坐标排序，实现前后遮挡）</td><td><code>Character::draw()</code> × N</td></tr>
+    <tr><td style="text-align:center">3</td><td>特效（骰子动画、事件文字飘出）</td><td><code>DiceAnim::draw()</code></td></tr>
+    <tr><td style="text-align:center">4</td><td>UI 叠加层（按钮、回合指示器、血条）</td><td><code>Widget::draw()</code> 栈</td></tr>
+  </tbody>
+</table>
+
+<p><strong>精灵表布局约定（Aseprite 导出）：</strong></p>
+
+<table class="meta-table">
+  <thead><tr><th>行</th><th>角色</th><th>列 0-3</th><th>列 4-7</th><th>列 8-13</th><th>列 14</th></tr></thead>
+  <tbody>
+    <tr><td style="text-align:center">0</td><td>玩家 (战士)</td><td>idle ×4</td><td>walk ×4</td><td>attack ×6</td><td>hurt ×1</td></tr>
+    <tr><td style="text-align:center">1</td><td>玩家 (法师)</td><td colspan="4" style="text-align:center;color:var(--muted)">同上，不同外观</td></tr>
+    <tr><td style="text-align:center">2</td><td>玩家 (盗贼)</td><td colspan="4" style="text-align:center;color:var(--muted)">同上</td></tr>
+    <tr><td style="text-align:center">3+</td><td>敌人 (木乃伊/骷髅/...)</td><td>idle ×4</td><td>walk ×4</td><td>attack ×4</td><td>hurt ×1</td></tr>
+  </tbody>
+</table>
+
+<p>所有精灵 16×16 像素，3 倍放大显示。美术用 Aseprite 绘制，导出单张 PNG 精灵表。</p>
+
+<h3>8.8 资产清单</h3>
+
+<table class="tree-table">
+  <thead><tr><th>路径</th><th>说明</th><th>大小</th></tr></thead>
+  <tbody>
+    <tr><td class="name file" style="padding-left:1.5rem">assets/images/tileset.png</td><td>16×16 瓦片集 (16列×N行)</td><td>~1KB</td></tr>
+    <tr><td class="name file" style="padding-left:1.5rem">assets/images/player_*.png</td><td>精灵表 (idle×4 + walk×4 + attack×6 + hurt)</td><td>~2KB</td></tr>
+    <tr><td class="name file" style="padding-left:1.5rem">assets/images/enemy_*.png</td><td>同上 (attack×4)</td><td>~2KB</td></tr>
+    <tr><td class="name file" style="padding-left:1.5rem">assets/images/dice.png</td><td>6面×4帧滚动 = 24格</td><td>~1KB</td></tr>
+    <tr><td class="name file" style="padding-left:1.5rem">assets/fonts/zpix.ttf</td><td>中文像素字体 (Zpix)</td><td>~3MB</td></tr>
+  </tbody>
+</table>
+
+<div class="note-box">
+  <strong>零技术风险。</strong>Sprite + SpriteAnim + Tilemap + Character 全是 SDL2 最基础的 <code>SDL_RenderCopy</code> 封装，回合制不需要帧同步、不需要 GPU shader、不需要骨骼动画。所有渲染逻辑约 200 行 C++。
+</div>
+
+<!-- ─── 9. 项目目录结构（表格表示） ─────────────────────────────── -->
+<h2 id="sec-dir">九、项目目录结构</h2>
+
+<table class="tree-table">
+  <thead>
+    <tr><th style="width:45%">路径</th><th style="width:12%">类型</th><th>说明</th></tr>
+  </thead>
+  <tbody>
+    <tr><td class="name dir">game/</td><td>📁 目录</td><td>项目根目录</td></tr>
+    <tr><td class="name config" style="padding-left:1.5rem">├── CMakeLists.txt</td><td>📄 构建</td><td>顶层 CMake 配置</td></tr>
+    <tr><td class="name dir" style="padding-left:1.5rem">├── src/</td><td>📁 目录</td><td>全部源代码</td></tr>
+    <tr><td class="name file" style="padding-left:3rem">├── main.cpp</td><td>📄 C++</td><td>入口 + 主循环</td></tr>
+    <tr><td class="name dir" style="padding-left:3rem">├── core/</td><td>📁 目录</td><td>游戏逻辑（纯 C++，无渲染依赖）</td></tr>
+    <tr><td class="name file" style="padding-left:4.5rem">├── player.h / .cpp</td><td>📄 C++</td><td>玩家数据结构</td></tr>
+    <tr><td class="name file" style="padding-left:4.5rem">├── room.h / .cpp</td><td>📄 C++</td><td>房间管理</td></tr>
+    <tr><td class="name file" style="padding-left:4.5rem">├── turn_manager.h / .cpp</td><td>📄 C++</td><td>回合调度</td></tr>
+    <tr><td class="name file" style="padding-left:4.5rem">├── dice_system.h / .cpp</td><td>📄 C++</td><td>骰子系统</td></tr>
+    <tr><td class="name file" style="padding-left:4.5rem">├── event_engine.h / .cpp</td><td>📄 C++</td><td>行为树事件引擎</td></tr>
+    <tr><td class="name file" style="padding-left:4.5rem">├── class_system.h / .cpp</td><td>📄 C++</td><td>职业系统</td></tr>
+    <tr><td class="name file" style="padding-left:4.5rem">└── ai_player.h / .cpp</td><td>📄 C++</td><td>AI + 超时托管</td></tr>
+    <tr><td class="name dir" style="padding-left:3rem">├── net/</td><td>📁 目录</td><td>网络层</td></tr>
+    <tr><td class="name file" style="padding-left:4.5rem">├── server.h / .cpp</td><td>📄 C++</td><td>select / epoll TCP server</td></tr>
+    <tr><td class="name file" style="padding-left:4.5rem">├── client.h / .cpp</td><td>📄 C++</td><td>TCP client</td></tr>
+    <tr><td class="name file" style="padding-left:4.5rem">├── protocol.h / .cpp</td><td>📄 C++</td><td>消息序列化 / 反序列化</td></tr>
+    <tr><td class="name file" style="padding-left:4.5rem">└── msg_types.h</td><td>📄 C++</td><td>消息类型定义</td></tr>
+    <tr><td class="name dir" style="padding-left:3rem">├── ui/</td><td>📁 目录</td><td>UI 层（SDL2 渲染）</td></tr>
+    <tr><td class="name file" style="padding-left:4.5rem">├── screen.h / .cpp</td><td>📄 C++</td><td>Screen 基类</td></tr>
+    <tr><td class="name file" style="padding-left:4.5rem">├── screen_manager.h / .cpp</td><td>📄 C++</td><td>Screen 栈管理器</td></tr>
+    <tr><td class="name file" style="padding-left:4.5rem">├── title_screen.h / .cpp</td><td>📄 C++</td><td>标题界面</td></tr>
+    <tr><td class="name file" style="padding-left:4.5rem">├── lobby_screen.h / .cpp</td><td>📄 C++</td><td>大厅界面</td></tr>
+    <tr><td class="name file" style="padding-left:4.5rem">├── class_pick_screen.h / .cpp</td><td>📄 C++</td><td>选职界面</td></tr>
+    <tr><td class="name file" style="padding-left:4.5rem">├── game_screen.h / .cpp</td><td>📄 C++</td><td>游戏主界面</td></tr>
+    <tr><td class="name file" style="padding-left:4.5rem">├── result_screen.h / .cpp</td><td>📄 C++</td><td>结算界面</td></tr>
+    <tr><td class="name dir" style="padding-left:4.5rem">└── widgets/</td><td>📁 目录</td><td>基础控件 + 精灵</td></tr>
+    <tr><td class="name file" style="padding-left:6rem">├── button.h / .cpp</td><td>📄 C++</td><td>按钮控件</td></tr>
+    <tr><td class="name file" style="padding-left:6rem">├── label.h / .cpp</td><td>📄 C++</td><td>文本标签</td></tr>
+    <tr><td class="name file" style="padding-left:6rem">├── sprite.h / .cpp</td><td>📄 C++</td><td>单帧精灵</td></tr>
+    <tr><td class="name file" style="padding-left:6rem">├── sprite_anim.h / .cpp</td><td>📄 C++</td><td>帧动画</td></tr>
+    <tr><td class="name file" style="padding-left:6rem">├── tilemap.h / .cpp</td><td>📄 C++</td><td>瓦片地图</td></tr>
+    <tr><td class="name file" style="padding-left:6rem">├── character.h / .cpp</td><td>📄 C++</td><td>像素角色</td></tr>
+    <tr><td class="name file" style="padding-left:6rem">└── dice_anim.h / .cpp</td><td>📄 C++</td><td>骰子动画</td></tr>
+    <tr><td class="name dir" style="padding-left:3rem">└── bt/</td><td>📁 目录</td><td>行为树配置</td></tr>
+    <tr><td class="name config" style="padding-left:4.5rem">├── enemy_ai.xml</td><td>📄 XML</td><td>AI 行为树</td></tr>
+    <tr><td class="name config" style="padding-left:4.5rem">└── event_trees.xml</td><td>📄 XML</td><td>事件分支树</td></tr>
+    <tr><td class="name dir" style="padding-left:1.5rem">├── assets/</td><td>📁 目录</td><td>资源文件</td></tr>
+    <tr><td class="name dir" style="padding-left:3rem">├── fonts/</td><td>📁 目录</td><td>字体</td></tr>
+    <tr><td class="name dir" style="padding-left:3rem">├── images/</td><td>📁 目录</td><td>图片</td></tr>
+    <tr><td class="name dir" style="padding-left:3rem">└── sounds/</td><td>📁 目录</td><td>音频</td></tr>
+    <tr><td class="name dir" style="padding-left:1.5rem">├── android/</td><td>📁 目录</td><td>Android SDL2 工程</td></tr>
+    <tr><td class="name file" style="padding-left:3rem">├── build.gradle</td><td>📄 Gradle</td><td>Android 构建脚本</td></tr>
+    <tr><td class="name file" style="padding-left:3rem">└── SDLActivity.java</td><td>📄 Java</td><td>SDL2 自带启动器</td></tr>
+    <tr><td class="name dir" style="padding-left:1.5rem">└── ios/</td><td>📁 目录</td><td>iOS Xcode 工程（SDL2 自带模板）</td></tr>
+  </tbody>
+</table>
+
+<!-- ─── 10. 模块开发流程 ────────────────────────────────────────── -->
+<h2 id="sec-workflow">十、模块开发流程</h2>
+
+<h3>10.1 单模块开发流水线</h3>
+
+<p>每个核心模块按以下流水线推进，确保每个阶段产出可独立验证：</p>
+
+<table class="pipeline-table">
+  <thead>
+    <tr><th style="width:5%">步</th><th style="width:20%">阶段</th><th style="width:25%">输入</th><th style="width:25%">输出</th><th>验证方式</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align:center">1</td>
+      <td class="step">🎯 定义接口</td>
+      <td class="in">需求描述</td>
+      <td class="out">.h 头文件（纯虚类）</td>
+      <td>CR 审查接口签名</td>
+    </tr>
+    <tr>
+      <td style="text-align:center">2</td>
+      <td class="step">🧪 写测试桩</td>
+      <td class="in">头文件</td>
+      <td class="out">test/*_test.cpp（Catch2）</td>
+      <td>编译通过，测试全部 FAIL（红）</td>
+    </tr>
+    <tr>
+      <td style="text-align:center">3</td>
+      <td class="step">⚙️ 实现</td>
+      <td class="in">头文件 + 测试</td>
+      <td class="out">.cpp 实现</td>
+      <td>测试全部 PASS（绿）</td>
+    </tr>
+    <tr>
+      <td style="text-align:center">4</td>
+      <td class="step">🔗 集成</td>
+      <td class="in">模块 .h/.cpp</td>
+      <td class="out">上层模块调用代码</td>
+      <td>集成测试通过</td>
+    </tr>
+    <tr>
+      <td style="text-align:center">5</td>
+      <td class="step">📦 交付</td>
+      <td class="in">集成代码</td>
+      <td class="out">标记版本 tag</td>
+      <td>完整流程复测</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>10.2 模块依赖图</h3>
+
+<div class="note-box">
+  <strong>核心原则：</strong>下层不依赖上层。每一层的测试不依赖上层模块。箭头方向表示"被谁依赖"。
+</div>
+
+<table class="meta-table">
+  <thead>
+    <tr><th>层</th><th>模块</th><th>依赖</th><th>可独立测试</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="color:var(--yellow);text-align:center">L0 基础设施</td>
+      <td>msg_types.h · protocol · DiceSystem · ClassSystem</td>
+      <td style="color:var(--muted)">无（纯数据 / 纯计算）</td>
+      <td><span class="badge badge-green">✅ 独立单元测试</span></td>
+    </tr>
+    <tr>
+      <td style="color:var(--yellow);text-align:center">L1 网络</td>
+      <td>Server · Client</td>
+      <td>→ protocol (L0)</td>
+      <td><span class="badge badge-green">✅ 本地回环测试</span></td>
+    </tr>
+    <tr>
+      <td style="color:var(--accent);text-align:center">L2 服务端逻辑</td>
+      <td>RoomMgr · TurnMgr</td>
+      <td>→ Server (L1) · DiceSystem (L0)</td>
+      <td><span class="badge badge-green">✅ 本地多 Client 模拟</span></td>
+    </tr>
+    <tr>
+      <td style="color:var(--accent);text-align:center">L3 事件 &amp; AI</td>
+      <td>EventEngine · AIPlayer</td>
+      <td>→ DiceSystem · ClassSystem (L0) · 行为树 XML</td>
+      <td><span class="badge badge-green">✅ 模拟骰子输入即可</span></td>
+    </tr>
+    <tr>
+      <td style="color:var(--green);text-align:center">L4 UI</td>
+      <td>Screen · ScreenManager · 各 Screen · Widgets</td>
+      <td>→ Client (L1) · 逻辑层回调</td>
+      <td><span class="badge badge-blue">⚠️ 需 SDL2 mock 或人工验证</span></td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>10.3 每条消息的端到端流程</h3>
+
+<p>以 <code>ACTION_REQ</code> → <code>DICE_ROLL</code> 为例：</p>
+
+<table class="meta-table">
+  <thead>
+    <tr><th style="width:8%">序号</th><th style="width:16%">执行方</th><th style="width:22%">动作</th><th>涉及模块</th></tr>
+  </thead>
+  <tbody>
+    <tr><td style="text-align:center">1</td><td>客户端 UI</td><td>玩家点击"探索"按钮</td><td style="color:var(--muted)">GameScreen → Action 回调</td></tr>
+    <tr><td style="text-align:center">2</td><td>客户端 net</td><td>序列化 <code>ACTION_REQ</code>，TCP 发送</td><td style="color:var(--muted)">protocol::encode() → Client::send()</td></tr>
+    <tr><td style="text-align:center">3</td><td>服务端 net</td><td>分帧读取，反序列化，路由到 TurnMgr</td><td style="color:var(--muted)">Server::recv() → protocol::decode() → TurnMgr</td></tr>
+    <tr><td style="text-align:center">4</td><td>服务端逻辑</td><td>TurnMgr 调用 DiceSystem.roll()，得到结果</td><td style="color:var(--muted)">TurnMgr → DiceSystem</td></tr>
+    <tr><td style="text-align:center">5</td><td>服务端逻辑</td><td>EventEngine 根据骰子结果查事件表</td><td style="color:var(--muted)">TurnMgr → EventEngine (行为树 tick)</td></tr>
+    <tr><td style="text-align:center">6</td><td>服务端 net</td><td>broadcast <code>DICE_ROLL</code> + <code>EVENT_FIRE</code></td><td style="color:var(--muted)">Server::broadcast()</td></tr>
+    <tr><td style="text-align:center">7</td><td>各客户端 net</td><td>接收消息，回调 UI</td><td style="color:var(--muted)">Client::poll() → GameScreen 回调</td></tr>
+    <tr><td style="text-align:center">8</td><td>各客户端 UI</td><td>播放骰子动画 → 展示事件描述 → 更新 HP</td><td style="color:var(--muted)">DiceAnim widget → GameScreen::on_update()</td></tr>
+  </tbody>
+</table>
+
+<!-- ─── 11. 实现顺序 ───────────────────────────────────────────── -->
+<h2 id="sec-order">十一、实现顺序</h2>
+
+<h3>11.1 五阶段路线图</h3>
+
+<table class="phase-table">
+  <thead>
+    <tr><th style="width:5%">阶段</th><th style="width:22%">名称</th><th style="width:12%">预计时间</th><th>目标</th><th>涉及文件</th><th style="width:10%">里程碑</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td class="phase-num">P0</td>
+      <td class="phase-title">🎯 骨架 &amp; 单机骰子</td>
+      <td>第 1 周</td>
+      <td class="phase-goal">SDL2 窗口能跑、骰子系统能 roll、Screen 栈能切</td>
+      <td class="phase-files">
+        CMakeLists.txt<br>
+        main.cpp<br>
+        core/dice_system.h/.cpp<br>
+        core/player.h/.cpp<br>
+        core/class_system.h/.cpp<br>
+        ui/screen.h/.cpp<br>
+        ui/screen_manager.h/.cpp<br>
+        ui/title_screen.h/.cpp<br>
+        ui/widgets/button.h/.cpp<br>
+        ui/widgets/label.h/.cpp<br>
+        ui/widgets/sprite.h/.cpp<br>
+        ui/widgets/sprite_anim.h/.cpp<br>
+        ui/widgets/tilemap.h/.cpp<br>
+        ui/widgets/character.h/.cpp<br>
+        ui/widgets/dice_anim.h/.cpp
+      </td>
+      <td><span class="badge badge-green">单机 Demo</span><br>骰子在屏幕上能投</td>
+    </tr>
+    <tr>
+      <td class="phase-num">P1</td>
+      <td class="phase-title">🔗 网络层</td>
+      <td>第 2 周</td>
+      <td class="phase-goal">两台手机通过 TCP 互发消息，房间能建能加入</td>
+      <td class="phase-files">
+        net/msg_types.h<br>
+        net/protocol.h/.cpp<br>
+        net/server.h/.cpp<br>
+        net/client.h/.cpp
+      </td>
+      <td><span class="badge badge-blue">双机通信</span><br>一台开服一台连</td>
+    </tr>
+    <tr>
+      <td class="phase-num">P2</td>
+      <td class="phase-title">🎮 核心玩法</td>
+      <td>第 3-4 周</td>
+      <td class="phase-goal">完整回合循环：选职业 → 投骰 → 事件 → 结算</td>
+      <td class="phase-files">
+        core/room.h/.cpp<br>
+        core/turn_manager.h/.cpp<br>
+        core/event_engine.h/.cpp<br>
+        bt/event_trees.xml<br>
+        ui/lobby_screen.h/.cpp<br>
+        ui/class_pick_screen.h/.cpp<br>
+        ui/game_screen.h/.cpp<br>
+        ui/result_screen.h/.cpp
+      </td>
+      <td><span class="badge badge-green">可玩回合</span><br>4-6 人一局跑通</td>
+    </tr>
+    <tr>
+      <td class="phase-num">P3</td>
+      <td class="phase-title">🤖 AI &amp; 鲁棒性</td>
+      <td>第 5-6 周</td>
+      <td class="phase-goal">单人模式可玩、掉线托管、超时处理、心跳检测</td>
+      <td class="phase-files">
+        core/ai_player.h/.cpp<br>
+        bt/enemy_ai.xml<br>
+        （修改 server.h/.cpp、turn_manager.h/.cpp）
+      </td>
+      <td><span class="badge badge-purple">单人可玩</span><br>App Store 审核能过</td>
+    </tr>
+    <tr>
+      <td class="phase-num">P4</td>
+      <td class="phase-title">✨ 打磨 &amp; 发布</td>
+      <td>第 7 周起</td>
+      <td class="phase-goal">UI 动画、音效、多语言、事件内容填充、性能优化</td>
+      <td class="phase-files">
+        assets/fonts/ · images/ · sounds/<br>
+        android/build.gradle<br>
+        ios/ (Xcode project)
+      </td>
+      <td><span class="badge badge-red">双端发布</span></td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>11.2 各阶段产出与验证清单</h3>
+
+<table>
+  <thead>
+    <tr><th style="width:8%">阶段</th><th style="width:30%">必须产出</th><th style="width:30%">验证方式</th><th>通过标准</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td class="phase-num" style="font-size:1rem">P0</td>
+      <td>
+        ✅ SDL2 窗口在 Android / iOS 均正常启动<br>
+        ✅ ScreenManager 可 push/pop 三个 Screen<br>
+        ✅ DiceSystem.roll() 返回值正确<br>
+        ✅ 骰子动画 widget 可播放
+      </td>
+      <td>
+        桌面 Linux 编译运行<br>
+        Android 真机一次<br>
+        iOS 模拟器一次
+      </td>
+      <td>
+        窗口 1280×720 正常显示<br>
+        按钮点击可触发 Screen 切换<br>
+        roll() 统计分布符合均匀分布<br>
+      </td>
+    </tr>
+    <tr>
+      <td class="phase-num" style="font-size:1rem">P1</td>
+      <td>
+        ✅ 服务器 listen :8888 成功<br>
+        ✅ 客户端 connect 成功，互相收发 JSON<br>
+        ✅ JOIN_REQ / JOIN_ACK 消息链路跑通<br>
+        ✅ 分帧逻辑正常（长度前缀正确）
+      </td>
+      <td>
+        本地两进程互测<br>
+        同一热点下两台手机联调
+      </td>
+      <td>
+        1000
