@@ -21,6 +21,14 @@ file(GLOB_RECURSE DRINKING_GAME_SOURCES CONFIGURE_DEPENDS
 )
 list(SORT DRINKING_GAME_SOURCES)
 
+file(GLOB_RECURSE DRINKING_GAME_ENGINE_SOURCES CONFIGURE_DEPENDS
+    "${DRINKING_GAME_ROOT}/src/engine/*.cpp"
+)
+list(SORT DRINKING_GAME_ENGINE_SOURCES)
+
+set(DRINKING_GAME_APP_SOURCES ${DRINKING_GAME_SOURCES})
+list(REMOVE_ITEM DRINKING_GAME_APP_SOURCES ${DRINKING_GAME_ENGINE_SOURCES})
+
 function(drinking_game_find_sdl2 out_target)
     set(_sdl2_target "")
 
@@ -68,17 +76,45 @@ endfunction()
 
 drinking_game_find_sdl2_image(DRINKING_GAME_SDL2_IMAGE_TARGET)
 
+add_library(XunWoEngine SHARED ${DRINKING_GAME_ENGINE_SOURCES})
+add_library(XunWoEngine_static STATIC ${DRINKING_GAME_ENGINE_SOURCES})
+
+foreach(_engine_target XunWoEngine XunWoEngine_static)
+    set_target_properties(${_engine_target}
+        PROPERTIES
+            OUTPUT_NAME XunWoEngine
+            ARCHIVE_OUTPUT_DIRECTORY "${DRINKING_GAME_ROOT}/lib"
+            LIBRARY_OUTPUT_DIRECTORY "${DRINKING_GAME_ROOT}/lib"
+            RUNTIME_OUTPUT_DIRECTORY "${DRINKING_GAME_ROOT}/lib"
+    )
+
+    target_include_directories(${_engine_target}
+        PUBLIC
+            "${DRINKING_GAME_ROOT}/inc"
+    )
+
+    target_link_libraries(${_engine_target}
+        PUBLIC
+            ${DRINKING_GAME_SDL2_TARGET}
+    )
+endforeach()
+
+set_target_properties(XunWoEngine
+    PROPERTIES
+        WINDOWS_EXPORT_ALL_SYMBOLS ON
+)
+
 if(ANDROID)
-    add_library(main SHARED ${DRINKING_GAME_SOURCES})
+    add_library(main SHARED ${DRINKING_GAME_APP_SOURCES})
     set(DRINKING_GAME_TARGET main)
 else()
     file(SIZE "${DRINKING_GAME_ROOT}/src/core/main.cpp" DRINKING_GAME_MAIN_SIZE)
 
     if(DRINKING_GAME_BUILD_DESKTOP AND DRINKING_GAME_MAIN_SIZE GREATER 0)
-        add_executable(drinking_game ${DRINKING_GAME_SOURCES})
+        add_executable(drinking_game ${DRINKING_GAME_APP_SOURCES})
         set(DRINKING_GAME_TARGET drinking_game)
     else()
-        add_library(drinking_game OBJECT ${DRINKING_GAME_SOURCES})
+        add_library(drinking_game OBJECT ${DRINKING_GAME_APP_SOURCES})
         set(DRINKING_GAME_TARGET drinking_game)
 
         if(DRINKING_GAME_BUILD_DESKTOP)
@@ -94,14 +130,19 @@ target_include_directories(${DRINKING_GAME_TARGET}
 
 target_link_libraries(${DRINKING_GAME_TARGET}
     PRIVATE
+        XunWoEngine
         ${DRINKING_GAME_SDL2_TARGET}
         ${DRINKING_GAME_SDL2_IMAGE_TARGET}
 )
 
 if(MSVC)
-    target_compile_options(${DRINKING_GAME_TARGET} PRIVATE /W4)
+    foreach(_compile_target ${DRINKING_GAME_TARGET} XunWoEngine XunWoEngine_static)
+        target_compile_options(${_compile_target} PRIVATE /W4)
+    endforeach()
 else()
-    target_compile_options(${DRINKING_GAME_TARGET} PRIVATE -Wall -Wextra -Wpedantic)
+    foreach(_compile_target ${DRINKING_GAME_TARGET} XunWoEngine XunWoEngine_static)
+        target_compile_options(${_compile_target} PRIVATE -Wall -Wextra -Wpedantic)
+    endforeach()
 endif()
 
 if(BUILD_TESTING AND NOT ANDROID)
@@ -116,7 +157,7 @@ if(BUILD_TESTING AND NOT ANDROID)
 
     target_link_libraries(screen_command_compile_test
         PRIVATE
-            ${DRINKING_GAME_SDL2_TARGET}
+            XunWoEngine
     )
 
     add_test(NAME screen_command_compile_test COMMAND screen_command_compile_test)
